@@ -1,0 +1,2171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayFlow - Modern UPI Wallet</title>
+    <script>
+        (function(){
+            try {
+                const t = localStorage.getItem('theme');
+                if (t) document.documentElement.setAttribute('data-theme', t);
+            } catch(e) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqrcode/0.0.1/jsqrcode.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root{
+            --bg:#0f1724;
+            --bg-2:#eaf2ff;
+            --card:#ffffff;
+            --muted:#8b93a7;
+            --accent1:linear-gradient(135deg,#7c5cff 0%,#5ee7df 100%);
+            --accent: #6b5cff;
+            --accent-2:#f59e0b;
+            --gold:#f6c85f;
+            --success:#2e7d32;
+            --danger:#c62828;
+            --glass: rgba(255,255,255,0.6);
+            --glass-2: rgba(255,255,255,0.06);
+            --glass-border: rgba(255,255,255,0.12);
+            --soft-shadow: 0 8px 30px rgba(16,24,40,0.12);
+            --bg-gradient: radial-gradient(1200px 600px at 10% 10%, rgba(122,96,255,0.08), transparent 8%), radial-gradient(1000px 500px at 90% 90%, rgba(94,231,223,0.06), transparent 8%), linear-gradient(180deg,#f6f9ff 0%, #eef6ff 40%, #f8fbff 100%);
+            --text-color: #071029;
+        }
+        [data-theme='dark']{
+            --bg:#0f1724;
+            --card:#0b1220;
+            --muted:#9aa3bf;
+            --accent:#7c5cff;
+            --glass: rgba(255,255,255,0.03);
+            --glass-2: rgba(255,255,255,0.02);
+            --bg-gradient: radial-gradient(900px 480px at 10% 10%, rgba(16,24,40,0.4), transparent 8%), radial-gradient(700px 340px at 90% 90%, rgba(22,32,48,0.35), transparent 8%), linear-gradient(180deg,#071029 0%, #081428 60%, #06101a 100%);
+            --text-color: #dfe9fb;
+        }
+        /* Dark theme element overrides for clearer contrast */
+        [data-theme='dark'] body, [data-theme='dark'] .dashboard, [data-theme='dark'] .auth-container {
+            background: var(--bg-gradient) !important;
+            color: var(--text-color) !important;
+        }
+        [data-theme='dark'] .auth-box,
+        [data-theme='dark'] .wallet-card,
+        [data-theme='dark'] .transaction-item,
+        [data-theme='dark'] .modal-content,
+        [data-theme='dark'] .stat-card,
+        [data-theme='dark'] .contact-item,
+        [data-theme='dark'] .toast,
+        [data-theme='dark'] .pending-requests-alert {
+            background: rgba(8,12,20,0.45);
+            border: 1px solid rgba(255,255,255,0.04);
+            color: var(--text-color);
+            box-shadow: 0 8px 30px rgba(2,6,12,0.6);
+        }
+        [data-theme='dark'] .wallet-balance { background: none !important; -webkit-text-fill-color: initial; }
+        [data-theme='dark'] .header { background: linear-gradient(90deg,#0b1220,#071029); color: var(--text-color); }
+        [data-theme='dark'] .header-icon { background: rgba(255,255,255,0.03); color: var(--text-color); }
+        [data-theme='dark'] .header-search { background: rgba(255,255,255,0.03); color: var(--text-color); box-shadow: none; }
+        [data-theme='dark'] input, [data-theme='dark'] textarea, [data-theme='dark'] select { background: rgba(255,255,255,0.03); color: var(--text-color); border-color: rgba(255,255,255,0.04); }
+        [data-theme='dark'] .modal { background: rgba(0,0,0,0.6); }
+        [data-theme='dark'] .wallet-id { color: rgba(223,233,251,0.6); }
+        [data-theme='dark'] .transaction-info, [data-theme='dark'] .stat-label { color: rgba(223,233,251,0.65); }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Animated, GPU-friendly background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: radial-gradient(800px 400px at 10% 10%, rgba(122,96,255,0.06), transparent 12%), radial-gradient(600px 300px at 90% 90%, rgba(94,231,223,0.04), transparent 10%);
+            filter: blur(30px) saturate(120%);
+            transform: translateZ(0);
+            will-change: transform, opacity;
+            animation: slowShift 18s linear infinite alternate;
+            pointer-events: none;
+            opacity: 0.95;
+        }
+
+        @keyframes slowShift {
+            0% { transform: translate3d(0,0,0) scale(1); }
+            50% { transform: translate3d(-30px,-10px,0) scale(1.02); }
+            100% { transform: translate3d(0,-20px,0) scale(1); }
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-color);
+            overflow-x: hidden;
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
+            transition: background .45s ease, color .25s ease;
+        }
+
+        /* Light-mode subtle texture (data-uri SVG) */
+        :root body {
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><defs><filter id='n' x='0' y='0'><feTurbulence baseFrequency='0.8' numOctaves='1' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter></defs><rect width='160' height='160' fill='%23ffffff' filter='url(%23n)' opacity='0.02'/></svg>");
+            background-repeat: repeat;
+            background-blend-mode: overlay;
+        }
+
+        /* Auth Page Styles */
+        .auth-container {
+            display: none;
+            min-height: 100vh;
+            background: linear-gradient(180deg,#eef6ff 0%, #fdfcff 60%);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-container.active {
+            display: flex;
+        }
+
+        .auth-box {
+            background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(248,251,255,0.9));
+            border-radius: 20px;
+            padding: 36px;
+            width: 100%;
+            max-width: 520px;
+            box-shadow: 0 20px 60px rgba(12,20,40,0.08);
+            border: 1px solid rgba(99,86,255,0.06);
+            animation: slideUp 0.5s cubic-bezier(.2,.9,.3,1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .auth-header h1 {
+            font-size: 32px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .auth-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: 'Poppins', sans-serif;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.28s cubic-bezier(.2,.9,.3,1);
+            font-family: 'Poppins', sans-serif;
+            box-shadow: 0 8px 30px rgba(16,24,40,0.06);
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg,var(--accent),var(--accent-2));
+            color: white;
+            margin-top: 10px;
+            letter-spacing: .2px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px) scale(1.01);
+            box-shadow: 0 18px 50px rgba(107,92,255,0.18);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #667eea;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .alerts {
+            margin-bottom: 20px;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+
+        /* Main Dashboard */
+        .dashboard {
+            display: none;
+            min-height: 100vh;
+            background: #f5f5f5;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .header {
+            background: var(--accent1);
+            color: white;
+            padding: 18px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            backdrop-filter: blur(6px);
+            box-shadow: 0 8px 30px rgba(16,24,40,0.12);
+            border-bottom-left-radius: 14px;
+            border-bottom-right-radius: 14px;
+        }
+
+        /* Light-mode enhancements */
+        :root .header {
+            background: linear-gradient(90deg,#7ad0ff 0%, #7c5cff 100%);
+            box-shadow: 0 12px 38px rgba(102,92,255,0.08);
+        }
+
+        .header-left{display:flex;align-items:center;gap:12px}
+        .header-avatar{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#ffffff,#e6eefc);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--accent);box-shadow:0 6px 18px rgba(16,24,40,0.12)}
+        .header-title{font-size:18px;font-weight:700}
+        .header-search{margin-left:8px;padding:8px 12px;border-radius:10px;border:none;min-width:220px;box-shadow:0 8px 26px rgba(8,12,30,0.06)}
+
+        .header h1{display:none}
+
+        .header-right {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        /* Floating action button */
+        .fab{position:fixed;right:22px;bottom:22px;width:64px;height:64px;border-radius:999px;background:linear-gradient(135deg,var(--accent),#f59e0b);display:flex;align-items:center;justify-content:center;color:white;font-size:26px;box-shadow:0 14px 40px rgba(102,126,234,0.28);cursor:pointer;z-index:999}
+
+        .header-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 18px;
+        }
+
+        .header-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .content {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Wallet Card */
+        .wallet-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,249,255,0.95));
+            color: var(--accent);
+            border-radius: 18px;
+            padding: 28px;
+            margin-bottom: 26px;
+            box-shadow: 0 18px 50px rgba(16,24,40,0.06);
+            position: relative;
+            overflow: hidden;
+            animation: slideUp 0.6s cubic-bezier(.2,.9,.3,1);
+            border: 1px solid rgba(16,24,40,0.04);
+            backdrop-filter: blur(6px) saturate(120%);
+        }
+
+        /* Subtle floating animation and improved wallet-id styling */
+        @keyframes floatSlow {
+            from { transform: translateY(0px); }
+            to { transform: translateY(-8px); }
+        }
+
+        .wallet-card {
+            transition: transform .45s cubic-bezier(.2,.9,.3,1), box-shadow .3s;
+            animation: floatSlow 6s ease-in-out infinite alternate;
+        }
+
+        .wallet-card:hover { transform: translateY(-6px) scale(1.005); box-shadow: 0 24px 60px rgba(16,24,40,0.08); }
+
+        .wallet-id {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: var(--glass-2);
+            color: var(--muted);
+            font-weight: 700;
+            margin-top: 8px;
+            letter-spacing: 0.6px;
+            box-shadow: inset 0 -2px 6px rgba(255,255,255,0.04);
+            transition: background .25s, color .25s, transform .25s;
+        }
+
+        [data-theme='dark'] .wallet-id { background: rgba(255,255,255,0.02); color: rgba(223,233,251,0.9); }
+        :root .wallet-id { background: rgba(255,255,255,0.85); color: #5467ff; }
+
+        /* Wallet balance entrance */
+        .wallet-balance { transition: transform .6s cubic-bezier(.2,.9,.3,1), opacity .6s; transform-origin:left center; }
+        .wallet-balance.animate { transform: translateY(-6px); opacity: 1; }
+
+        /* FAB gentle pulse */
+        @keyframes pulseFab { 0% { transform: scale(1); } 50% { transform: scale(1.04); } 100% { transform: scale(1); } }
+        .fab { transition: box-shadow .2s, transform .2s; }
+        .fab:hover { transform: translateY(-4px) scale(1.02); box-shadow: 0 20px 50px rgba(107,92,255,0.18);} 
+
+        .wallet-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .wallet-card::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -5%;
+            width: 200px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+        }
+
+        /* Shimmer overlay on wallet card */
+        .wallet-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 80%);
+            transform: translateX(-120%);
+            pointer-events: none;
+            will-change: transform;
+            animation: shimmer 6s linear infinite;
+            mix-blend-mode: overlay;
+            opacity: 0.9;
+        }
+
+        @keyframes shimmer { to { transform: translateX(120%); } }
+
+        .wallet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .wallet-info h2 {
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .wallet-balance {
+            font-size: 42px;
+            font-weight: 900;
+            letter-spacing: -1px;
+            background: linear-gradient(90deg,var(--accent),#7ad0ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .wallet-id {
+            background: linear-gradient(135deg,#ffffff 0%,#f1f5ff 100%);
+            color: var(--accent);
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 5px;
+        }
+
+        .wallet-actions {
+            display: flex;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .wallet-action-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: var(--accent);
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wallet-action-btn:hover {
+            background: rgba(255,255,255,0.12);
+            transform: scale(1.1);
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(4,1fr);
+            gap: 14px;
+            margin-bottom: 24px;
+            animation: slideUp 0.7s cubic-bezier(.2,.9,.3,1);
+        }
+
+        /* Reveal animations */
+        .visible { opacity: 1 !important; transform: translateY(0) !important; }
+        .section, .action-btn, .stat-card, .transaction-item { opacity: 0; transform: translateY(14px); transition: transform .6s cubic-bezier(.2,.9,.3,1), opacity .6s ease; will-change: transform, opacity; }
+
+        .action-btn { transform-origin: center; }
+
+        /* Transaction item subtle pop */
+        .transaction-item { transition: transform .45s cubic-bezier(.2,.9,.3,1), box-shadow .3s, opacity .45s; }
+        .transaction-item.visible { transform: translateY(0) scale(1); box-shadow: 0 18px 40px rgba(12,20,40,0.06); }
+
+        /* FAB micro-interaction */
+        .fab { transition: transform .22s cubic-bezier(.2,.9,.3,1), box-shadow .22s; }
+        .fab:active { transform: scale(0.96); }
+
+        /* Button ripple container */
+        .ripple { position: absolute; border-radius: 50%; transform: scale(0); animation: ripple .6s linear; background: rgba(255,255,255,0.24); pointer-events:none; }
+        @keyframes ripple { to { transform: scale(10); opacity: 0; } }
+
+        .action-btn {
+            background: linear-gradient(180deg,#ffffff 0%, #f6f9ff 100%);
+            border: 1px solid rgba(16,24,40,0.06);
+            border-radius: 16px;
+            padding: 18px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.22s cubic-bezier(.2,.9,.3,1);
+            box-shadow: 0 14px 36px rgba(12,20,40,0.06);
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+        }
+
+        .action-btn:active {
+            transform: translateY(-2px);
+        }
+
+        .action-btn i {
+            font-size: 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .action-btn span {
+            font-size: 12px;
+            color: #333;
+        }
+
+        /* Pending Requests */
+        .pending-requests-alert {
+            background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+            animation: slideDown 0.4s ease;
+        }
+
+        .pending-requests-alert h3 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .request-item {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 10px;
+            margin: 8px 0;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .request-info {
+            flex: 1;
+        }
+
+        .request-amount {
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        /* Sections */
+        .section {
+            animation: slideUp 0.8s ease;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title i {
+            color: #667eea;
+            font-size: 18px;
+        }
+
+        /* Transaction List */
+        .transaction-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .transaction-item {
+            background: linear-gradient(180deg,#ffffff 0%, #fbfdff 100%);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            transition: all 0.26s cubic-bezier(.2,.9,.3,1);
+            cursor: pointer;
+            border: 1px solid rgba(16,24,40,0.04);
+            box-shadow: 0 12px 36px rgba(12,20,40,0.06);
+        }
+
+        .transaction-item .avatar {
+            width:50px;height:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;color:white;background:linear-gradient(135deg,#667eea,#764ba2)
+        }
+
+        .toast-wrap{position:fixed;right:18px;top:18px;z-index:99999;display:flex;flex-direction:column;gap:10px}
+        .toast{background:linear-gradient(180deg,#fff,#fbfdff);border-left:4px solid var(--accent);padding:12px 16px;border-radius:10px;box-shadow:0 12px 36px rgba(16,24,40,0.08);min-width:220px}
+
+        /* Undo bar */
+        #undo-bar{transition:all .2s cubic-bezier(.2,.8,.2,1)}
+        #undo-bar .progress{height:6px;background:linear-gradient(90deg,var(--accent),#f59e0b);border-radius:6px;margin-top:8px}
+
+        .transaction-item:hover {
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            transform: translateX(3px);
+        }
+
+        .transaction-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .transaction-icon.debit {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .transaction-icon.credit {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .transaction-icon.request {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .transaction-details {
+            flex: 1;
+        }
+
+        .transaction-desc {
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 14px;
+        }
+
+        .transaction-info {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 3px;
+        }
+
+        .transaction-amount {
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .transaction-amount.debit {
+            color: #c62828;
+        }
+
+        .transaction-amount.credit {
+            color: #2e7d32;
+        }
+
+        .transaction-amount.request {
+            color: #f57c00;
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card);
+            border-radius: 30px 30px 0 0;
+            width: 100%;
+            max-width: 500px;
+            padding: 30px 20px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUpModal 0.4s ease;
+        }
+
+        @keyframes slideUpModal {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .modal-header h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            transition: all 0.3s;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .form-group-inline {
+            margin-bottom: 18px;
+        }
+
+        .form-group-inline label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .form-group-inline input,
+        .form-group-inline select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: 'Poppins', sans-serif;
+            transition: all 0.3s;
+        }
+
+        .form-group-inline input:focus,
+        .form-group-inline select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .modal-submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .modal-submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        /* QR Code Modal */
+        .qr-container {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .qr-display {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            display: inline-block;
+        }
+
+        .qr-display div {
+            display: inline-block !important;
+        }
+
+        .qr-scanner-video {
+            width: 100%;
+            border-radius: 15px;
+            margin: 15px 0;
+            border: 1px solid rgba(0,0,0,0.06);
+            background: #000; /* fallback so video area is visible */
+        }
+
+        .scan-button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            margin: 10px 0;
+            font-family: 'Poppins', sans-serif;
+            box-shadow: 0 8px 30px rgba(102,126,234,0.18);
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 18px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #999;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Profile Modal */
+        .profile-section {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin: 0 auto 15px;
+        }
+
+        .profile-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .profile-id {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .contact-item {
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 8px;
+        }
+
+        .contact-item:hover {
+            background: #f5f5f5;
+            transform: translateX(3px);
+        }
+
+        .contact-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .modal-content {
+                border-radius: 25px 25px 0 0;
+            }
+
+            .content {
+                padding: 15px;
+            }
+
+            .wallet-card {
+                padding: 20px;
+            }
+
+            .wallet-balance {
+                font-size: 28px;
+            }
+
+            .quick-actions {
+                grid-template-columns: 1fr 1fr 1fr 1fr;
+                gap: 8px;
+            }
+
+            .action-btn {
+                padding: 15px 5px;
+                font-size: 11px;
+            }
+
+            .header {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- LOGIN & REGISTER PAGE -->
+    <div id="auth-container" class="auth-container active">
+        <div class="auth-box">
+            <div class="auth-header">
+                <h1>💳 PayFlow</h1>
+                <p>Modern UPI Payment App</p>
+            </div>
+
+            <div id="auth-alerts" class="alerts"></div>
+
+            <!-- Login Form -->
+            <div id="login-form">
+                <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+                    <div style="font-size:13px;color:#666;font-weight:600;">Login as:</div>
+                    <button id="role-user-btn" class="btn btn-secondary" style="width:auto;padding:6px 10px;font-size:13px;margin-right:6px;">User</button>
+                    <button id="role-admin-btn" class="btn" style="width:auto;padding:6px 10px;font-size:13px;background:#fff;color:#667eea;border:1px solid #e0e0e0;">Admin</button>
+                </div>
+                <input type="hidden" id="login-role" value="user">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="login-username" placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="Enter your password">
+                </div>
+                <button class="btn btn-primary" onclick="handleLogin()">Sign In</button>
+                <button id="resume-session-btn" class="btn btn-secondary" style="display:none;margin-top:8px;" onclick="resumeSession()">Resume Session</button>
+                <button class="btn btn-secondary" onclick="switchToRegister()">Create Account</button>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" style="display: none;">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="reg-fullname" placeholder="Enter your full name">
+                </div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="reg-username" placeholder="Choose a username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="reg-password" placeholder="Create a password">
+                </div>
+                <button class="btn btn-primary" onclick="handleRegister()">Create Account</button>
+                <button class="btn btn-secondary" onclick="switchToLogin()">Back to Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="dashboard" class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <h1>PayFlow</h1>
+            <div class="header-right">
+                <button id="theme-toggle" class="header-icon" title="Toggle theme" onclick="toggleTheme()">🌗</button>
+                <div class="header-icon" onclick="openModal('profile-modal')" title="Profile">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="header-icon" onclick="handleLogout()" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content">
+            <!-- Wallet Card -->
+            <div class="wallet-card">
+                <div class="wallet-header">
+                    <div class="wallet-info">
+                        <h2>Available Balance</h2>
+                        <div class="wallet-balance" id="walletBalance">₹0</div>
+                        <div class="wallet-id" id="walletId">#WLT-0000</div>
+                    </div>
+                    <div class="wallet-actions">
+                        <button class="wallet-action-btn" onclick="openModal('qr-modal')" title="View QR">
+                            <i class="fas fa-qrcode"></i>
+                        </button>
+                        <button class="wallet-action-btn" onclick="openModal('scan-modal')" title="Scan QR">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Floating action button -->
+            <div class="fab" title="Quick send" onclick="openModal('send-modal')">+</div>
+
+            <!-- Pending Requests Alert -->
+            <div id="pending-requests-container"></div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <button class="action-btn" onclick="openModal('send-modal')">
+                    <i class="fas fa-arrow-right"></i>
+                    <span>Send</span>
+                </button>
+                <button class="action-btn" onclick="openModal('request-modal')">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Request</span>
+                </button>
+                <!-- Add Money removed per request -->
+                <button class="action-btn" onclick="openModal('contacts-modal')">
+                    <i class="fas fa-users"></i>
+                    <span>Contacts</span>
+                </button>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Sent This Month</div>
+                    <div class="stat-value" id="monthlySent">₹0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Received This Month</div>
+                    <div class="stat-value" id="monthlyReceived">₹0</div>
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <div class="section">
+                <div class="section-title">
+                    <i class="fas fa-history"></i>
+                    Recent Transactions
+                </div>
+                <div class="transaction-list" id="recent-transactions">
+                    <div style="text-align: center; padding: 20px; color: #999;">
+                        <i class="fas fa-inbox"></i> No transactions yet
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEND MONEY MODAL -->
+    <div id="send-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-arrow-right"></i> Send Money</h3>
+                <button class="close-btn" onclick="closeModal('send-modal')">&times;</button>
+            </div>
+            <div id="send-alert" class="alerts"></div>
+            <div class="form-group-inline">
+                <label>Recipient Username</label>
+                <input type="text" id="send-recipient" placeholder="Enter username">
+            </div>
+            <div class="form-group-inline">
+                <label>Amount</label>
+                <input type="number" id="send-amount" placeholder="₹0.00" min="0" step="0.01">
+            </div>
+            <div class="form-group-inline">
+                <label>Note (Optional)</label>
+                <input type="text" id="send-note" placeholder="What's this for?">
+            </div>
+            <button class="modal-submit-btn" onclick="sendMoney()">
+                <i class="fas fa-arrow-right"></i> Send Money
+            </button>
+        </div>
+    </div>
+
+    <!-- REQUEST MONEY MODAL -->
+    <div id="request-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-arrow-left"></i> Request Money</h3>
+                <button class="close-btn" onclick="closeModal('request-modal')">&times;</button>
+            </div>
+            <div id="request-alert" class="alerts"></div>
+            <div class="form-group-inline">
+                <label>Request From (Username)</label>
+                <input type="text" id="request-from" placeholder="Enter username">
+            </div>
+            <div class="form-group-inline">
+                <label>Amount</label>
+                <input type="number" id="request-amount" placeholder="₹0.00" min="0" step="0.01">
+            </div>
+            <div class="form-group-inline">
+                <label>Reason</label>
+                <input type="text" id="request-reason" placeholder="Why do you need this?">
+            </div>
+            <button class="modal-submit-btn" onclick="requestMoney()">
+                <i class="fas fa-arrow-left"></i> Send Request
+            </button>
+        </div>
+    </div>
+
+    <!-- Add Money feature removed -->
+
+    <!-- QR CODE MODAL -->
+    <div id="qr-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-qrcode"></i> Your QR Code</h3>
+                <button class="close-btn" onclick="closeModal('qr-modal')">&times;</button>
+            </div>
+            <div class="qr-container">
+                <p style="color: #666; margin-bottom: 15px;">Share this QR code to receive money</p>
+                <div class="qr-display" id="qr-code"></div>
+                <p style="font-size: 12px; color: #999; margin-top: 15px;" id="qr-info"></p>
+                <button class="modal-submit-btn" onclick="downloadQR()" style="margin-top: 20px;">
+                    <i class="fas fa-download"></i> Download QR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCAN QR MODAL -->
+    <div id="scan-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-camera"></i> Scan QR Code</h3>
+                <button class="close-btn" onclick="closeModal('scan-modal')">&times;</button>
+            </div>
+            <div id="scan-alert" class="alerts"></div>
+            <div style="text-align: center;">
+                <p style="color: #666; margin-bottom: 15px;">Point your camera at a QR code</p>
+                <video id="scanner-video" class="qr-scanner-video" style="display:none;"></video>
+                <button class="scan-button" onclick="startQRScanner()" id="start-scan-btn">
+                    <i class="fas fa-camera"></i> Start Camera
+                </button>
+                <div id="scanned-result" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTACTS MODAL -->
+    <div id="contacts-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-users"></i> Saved Contacts</h3>
+                <button class="close-btn" onclick="closeModal('contacts-modal')">&times;</button>
+            </div>
+            <div id="contacts-list" style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="text-align: center; padding: 30px; color: #999;">
+                    <i class="fas fa-address-book" style="font-size: 30px; margin-bottom: 10px; display: block;"></i>
+                    Loading contacts...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PROFILE MODAL -->
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user"></i> Profile</h3>
+                <button class="close-btn" onclick="closeModal('profile-modal')">&times;</button>
+            </div>
+            <div class="profile-section">
+                <div class="profile-avatar" id="profile-avatar"></div>
+                <div class="profile-name" id="profile-name"></div>
+                <div class="profile-id" id="profile-username"></div>
+                <div class="profile-id" id="profile-role"></div>
+            </div>
+            <div class="stats-grid" style="margin-bottom: 20px;">
+                <div class="stat-card">
+                    <div class="stat-label">Total Sent</div>
+                    <div class="stat-value" id="profile-total-sent">₹0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Received</div>
+                    <div class="stat-value" id="profile-total-received">₹0</div>
+                </div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Transactions</div>
+                    <div class="stat-value" id="profile-total-txns">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Net Balance</div>
+                    <div class="stat-value" id="profile-net">₹0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        let currentUser = null;
+        let allTransactions = [];
+        let recentContacts = [];
+
+        // ============= AUTHENTICATION =============
+        function handleLogin() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            const role = document.getElementById('login-role') ? document.getElementById('login-role').value : 'user';
+
+            if (!username || !password) {
+                showAlert('auth-alerts', 'Please fill in all fields', 'error');
+                return;
+            }
+
+            fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    currentUser = data.user;
+                    // ensure role in currentUser matches server
+                    if (role && currentUser.role !== role) {
+                        // user might have mismatched role; server role prevails
+                        console.warn('Login role mismatch, server role:', currentUser.role);
+                    }
+                    try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e){}
+                    showDashboard();
+                } else {
+                    showAlert('auth-alerts', data.detail || 'Login failed', 'error');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                showAlert('auth-alerts', 'Connection failed', 'error');
+            });
+        }
+
+        function handleRegister() {
+            const fullname = document.getElementById('reg-fullname').value;
+            const username = document.getElementById('reg-username').value;
+            const password = document.getElementById('reg-password').value;
+
+            if (!fullname || !username || !password) {
+                showAlert('auth-alerts', 'Please fill in all fields', 'error');
+                return;
+            }
+
+            fetch(`${API_BASE}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ full_name: fullname, username, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showAlert('auth-alerts', 'Account created! Please login.', 'success');
+                    switchToLogin();
+                } else {
+                    showAlert('auth-alerts', data.detail || 'Registration failed', 'error');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                showAlert('auth-alerts', 'Connection failed', 'error');
+            });
+        }
+
+        function switchToLogin() {
+            setLoginView();
+        }
+
+        function switchToRegister() {
+            setRegisterView();
+        }
+
+        // DOM-only view setters (no history manipulation when called with noPush=true)
+        function setLoginView(noPush = false) {
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('register-form').style.display = 'none';
+            const r = document.getElementById('login-role');
+            if (r) {
+                document.getElementById('role-user-btn').className = r.value === 'user' ? 'btn' : 'btn btn-secondary';
+                document.getElementById('role-admin-btn').className = r.value === 'admin' ? 'btn' : 'btn btn-secondary';
+            }
+            if (!noPush) {
+                try { history.pushState({page:'login'}, '', '#login'); } catch(e) {}
+            }
+        }
+
+        function setRegisterView(noPush = false) {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'block';
+            if (!noPush) {
+                try { history.pushState({page:'register'}, '', '#register'); } catch(e) {}
+            }
+        }
+
+        function handleLogout() {
+            currentUser = null;
+            document.getElementById('dashboard').classList.remove('active');
+            document.getElementById('auth-container').classList.add('active');
+            document.getElementById('login-username').value = '';
+            document.getElementById('login-password').value = '';
+            try { localStorage.removeItem('currentUser'); } catch(e){}
+            try { history.replaceState({page:'login'}, '', '#login'); } catch(e) {}
+        }
+
+        function showDashboard() {
+            setDashboard();
+        }
+
+        // DOM-only dashboard setter; use noPush=true when called from popstate
+        function setDashboard(noPush = false) {
+            document.getElementById('dashboard').classList.add('active');
+            document.getElementById('auth-container').classList.remove('active');
+            updateDashboard();
+            if (!noPush) {
+                try { history.pushState({page: 'dashboard'}, '', '#dashboard'); } catch(e) {}
+            }
+            // if admin, load admin accounts
+            if (currentUser && currentUser.role === 'admin') {
+                fetchAdminAccounts();
+            }
+        }
+
+        function fetchAdminAccounts() {
+            // show loading
+            const content = document.querySelector('.content');
+            if (content) content.innerHTML = '<h2 style="margin-bottom:12px;">Admin - All Accounts</h2><div id="admin-accounts">Loading...</div>';
+            fetch(`${API_BASE}/admin/accounts?user_id=${currentUser.user_id}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success' && Array.isArray(data.accounts)) {
+                        const rows = data.accounts.map(a => `
+                            <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #eee;">
+                                <div><strong>${a.full_name}</strong> <small style="color:#666">@${a.username}</small></div>
+                                <div style="text-align:right">WLT:${a.wallet_id} • ₹${parseFloat(a.balance).toLocaleString()}</div>
+                            </div>
+                        `).join('');
+                        const el = document.getElementById('admin-accounts');
+                        if (el) el.innerHTML = `<div style="border:1px solid #eee;border-radius:8px;overflow:hidden">${rows}</div>`;
+                    } else {
+                        const el = document.getElementById('admin-accounts');
+                        if (el) el.innerHTML = `<div style="color:#c00">${data.detail || 'Failed to load accounts'}</div>`;
+                    }
+                }).catch(err => {
+                    console.error('Admin accounts error', err);
+                    const el = document.getElementById('admin-accounts');
+                    if (el) el.innerHTML = `<div style="color:#c00">Server error</div>`;
+                });
+        }
+
+        // ============= UTILITIES =============
+        function showAlert(elementId, message, type = 'error') {
+            // keep legacy per-element alerts
+            try {
+                const alertEl = document.getElementById(elementId);
+                if (alertEl) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = `alert alert-${type}`;
+                    alertDiv.innerHTML = `${type === 'success' ? '✓' : '✕'} ${message}`;
+                    alertEl.innerHTML = '';
+                    alertEl.appendChild(alertDiv);
+                    setTimeout(() => { alertEl.innerHTML = ''; }, 4000);
+                }
+            } catch(e){}
+
+            // toast notification
+            let wrap = document.querySelector('.toast-wrap');
+            if (!wrap) {
+                wrap = document.createElement('div');
+                wrap.className = 'toast-wrap';
+                document.body.appendChild(wrap);
+            }
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.innerHTML = `<div style="font-weight:700;margin-bottom:6px;">${type==='success'?'Success':'Notice'}</div><div style="font-size:13px;color:var(--muted)">${message}</div>`;
+            wrap.appendChild(t);
+            setTimeout(() => { t.style.transition='opacity .3s'; t.style.opacity=0; setTimeout(()=>t.remove(),300); }, 4500);
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+            if (modalId === 'qr-modal' && !document.getElementById('qr-code').innerHTML) {
+                generateQR();
+            }
+            if (modalId === 'profile-modal') {
+                updateProfileModal();
+            }
+            if (modalId === 'contacts-modal') {
+                loadContacts();
+            }
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('active');
+            }
+        });
+
+        // ============= TRANSACTIONS =============
+        async function sendMoney() {
+            const recipient = document.getElementById('send-recipient').value;
+            const amount = parseFloat(document.getElementById('send-amount').value);
+            const note = document.getElementById('send-note').value || 'Payment';
+
+            if (!recipient || !amount || amount <= 0) {
+                showAlert('send-alert', 'Please fill in all fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/transaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.user_id,
+                        transaction_type: 'transfer',
+                        amount,
+                        description: note,
+                        receiver_username: recipient
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok && data.status === 'success') {
+                    showAlert('send-alert', `✓ ₹${amount.toLocaleString()} sent successfully!`, 'success');
+                    currentUser.balance = data.new_balance;
+                    try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e){}
+                    document.getElementById('send-recipient').value = '';
+                    document.getElementById('send-amount').value = '';
+                    document.getElementById('send-note').value = '';
+                    setTimeout(() => closeModal('send-modal'), 1500);
+                    fetchTransactions();
+
+                    // show undo bar for reversible transfer (30s)
+                    if (data.transaction_id) {
+                        showUndoBar(data.transaction_id, amount);
+                    }
+                } else {
+                    showAlert('send-alert', data.detail || 'Transaction failed', 'error');
+                }
+            } catch (err) {
+                showAlert('send-alert', 'Connection failed', 'error');
+            }
+        }
+
+        // Show an undo bar allowing the sender to reverse the last transfer within 30s
+        function showUndoBar(transactionId, amount) {
+            // remove existing
+            let existing = document.getElementById('undo-bar');
+            if (existing) existing.remove();
+
+            const bar = document.createElement('div');
+            bar.id = 'undo-bar';
+            bar.style = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #ddd;padding:12px 16px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:9999;display:flex;align-items:center;gap:12px';
+            bar.innerHTML = `<div style="font-weight:600;">Sent ₹${amount.toLocaleString()}</div>`;
+            const undoBtn = document.createElement('button');
+            undoBtn.className = 'btn btn-secondary';
+            undoBtn.style = 'padding:6px 10px;font-size:13px';
+            undoBtn.textContent = 'Undo';
+            undoBtn.onclick = () => reverseTransaction(transactionId, bar);
+            bar.appendChild(undoBtn);
+
+            // progress indicator
+            const progWrap = document.createElement('div');
+            progWrap.style = 'flex:1;margin-left:12px;min-width:140px';
+            progWrap.innerHTML = `<div style="font-size:12px;color:var(--muted);">Undo available</div><div class="progress" style="width:100%"><div id="undo-progress-${transactionId}" style="width:100%;height:6px;border-radius:6px;background:linear-gradient(90deg,var(--accent),#f59e0b)"></div></div>`;
+            bar.appendChild(progWrap);
+
+            document.body.appendChild(bar);
+
+            // animate progress from 100% to 0 over 30s
+            const progBar = document.getElementById(`undo-progress-${transactionId}`);
+            if (progBar) {
+                let start = Date.now();
+                const total = 30000;
+                const iv = setInterval(() => {
+                    const elapsed = Date.now() - start;
+                    const pct = Math.max(0, 100 - (elapsed / total) * 100);
+                    progBar.style.width = pct + '%';
+                    if (elapsed >= total) {
+                        clearInterval(iv);
+                        if (bar.parentNode) bar.remove();
+                    }
+                }, 200);
+            }
+        }
+
+        async function reverseTransaction(transactionId, barEl = null) {
+            try {
+                const response = await fetch(`${API_BASE}/reverse-transaction`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ transaction_id: transactionId, user_id: currentUser.wallet_id })
+                });
+                const data = await response.json();
+                if (response.ok && data.status === 'success') {
+                    showAlert('auth-alerts', '✓ Transfer reversed', 'success');
+                    if (barEl && barEl.parentNode) barEl.remove();
+                    fetchTransactions();
+                } else {
+                    showAlert('auth-alerts', data.detail || 'Reversal failed', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showAlert('auth-alerts', 'Server connection failed', 'error');
+            }
+        }
+
+        async function requestMoney() {
+            const fromUser = document.getElementById('request-from').value;
+            const amount = parseFloat(document.getElementById('request-amount').value);
+            const reason = document.getElementById('request-reason').value || 'Money request';
+
+            if (!fromUser || !amount || amount <= 0) {
+                showAlert('request-alert', 'Please fill in all fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/transaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.user_id,
+                        transaction_type: 'request_money',
+                        amount,
+                        description: reason,
+                        receiver_username: fromUser
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok && data.status === 'success') {
+                    showAlert('request-alert', `✓ Request sent to ${fromUser}!`, 'success');
+                    document.getElementById('request-from').value = '';
+                    document.getElementById('request-amount').value = '';
+                    document.getElementById('request-reason').value = '';
+                    setTimeout(() => closeModal('request-modal'), 1500);
+                    fetchTransactions();
+                } else {
+                    showAlert('request-alert', data.detail || 'Request failed', 'error');
+                }
+            } catch (err) {
+                showAlert('request-alert', 'Connection failed', 'error');
+            }
+        }
+
+        async function addMoney() {
+            const amount = parseFloat(document.getElementById('add-amount').value);
+
+            if (!amount || amount <= 0) {
+                showAlert('add-alert', 'Please enter a valid amount', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/transaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.user_id,
+                        transaction_type: 'deposit',
+                        amount,
+                        description: 'Added funds'
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok && data.status === 'success') {
+                    showAlert('add-alert', `✓ ₹${amount.toLocaleString()} added!`, 'success');
+                    currentUser.balance = data.new_balance;
+                    try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e){}
+                    document.getElementById('add-amount').value = '';
+                    setTimeout(() => closeModal('add-modal'), 1500);
+                    fetchTransactions();
+                } else {
+                    showAlert('add-alert', data.detail || 'Failed to add money', 'error');
+                }
+            } catch (err) {
+                showAlert('add-alert', 'Connection failed', 'error');
+            }
+        }
+
+        async function fetchTransactions() {
+            try {
+                const response = await fetch(`${API_BASE}/ledger/${currentUser.wallet_id}`);
+                const data = await response.json();
+                allTransactions = data.transactions || [];
+
+                const container = document.getElementById('recent-transactions');
+                if (allTransactions.length === 0) {
+                    container.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;"><i class="fas fa-inbox"></i> No transactions yet</div>';
+                    return;
+                }
+
+                // Extract recent contacts
+                recentContacts = [];
+                allTransactions.forEach(txn => {
+                    const name = txn.sender_id === currentUser.wallet_id ? txn.receiver_name : txn.sender_name;
+                    const username = txn.sender_id === currentUser.wallet_id ? txn.receiver_username : txn.sender_username;
+                    if (username && !recentContacts.find(c => c.username === username)) {
+                        recentContacts.push({ name, username });
+                    }
+                });
+
+                container.innerHTML = allTransactions.slice(0, 10).map(txn => {
+                    const isDebit = txn.sender_id === currentUser.wallet_id;
+                    const counterparty = isDebit ? txn.receiver_name : txn.sender_name;
+                    let txnType = isDebit ? 'debit' : 'credit';
+                    let icon = isDebit ? '→' : '←';
+                    let desc = txn.description;
+
+                    const avatarLetter = (counterparty || 'S').charAt(0).toUpperCase();
+                    return `
+                        <div class="transaction-item">
+                            <div class="avatar">${avatarLetter}</div>
+                            <div class="transaction-details">
+                                <div class="transaction-desc">${desc}</div>
+                                <div class="transaction-info">${counterparty || 'System'} • ${new Date(txn.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <div class="transaction-amount ${txnType}">${isDebit ? '-' : '+'}₹${parseFloat(txn.amount).toLocaleString()}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                // reveal newly inserted transaction items with a small stagger
+                setTimeout(() => {
+                    const items = Array.from(document.querySelectorAll('.transaction-item'));
+                    items.forEach((it, idx) => setTimeout(()=> it.classList.add('visible'), idx * 80));
+                }, 80);
+
+                updateStats();
+                fetchPendingRequests();
+            } catch (err) {
+                console.error('Error fetching transactions:', err);
+            }
+        }
+
+        async function fetchPendingRequests() {
+            try {
+                const response = await fetch(`${API_BASE}/pending-requests/${currentUser.wallet_id}`);
+                const data = await response.json();
+                console.log('pending-requests response:', data);
+
+                if (data.pending_requests && data.pending_requests.length > 0) {
+                    let html = `<div class="pending-requests-alert">
+                        <h3><i class="fas fa-bell"></i> Pending Requests (${data.pending_requests.length})</h3>`;
+                    
+                    data.pending_requests.forEach(req => {
+                        html += `<div class="request-item">
+                            <div class="request-info">
+                                <strong>${req.from_name}</strong> @${req.from_user}<br>
+                                <small>${req.reason}</small>
+                            </div>
+                            <div class="request-amount">₹${parseFloat(req.amount).toLocaleString()}</div>
+                            <button class="btn btn-secondary" style="font-size:12px;padding:6px 10px;margin-left:10px;" onclick="approveRequest(${req.request_id})">Approve</button>
+                        </div>`;
+                    });
+                    
+                    html += `</div>`;
+                    document.getElementById('pending-requests-container').innerHTML = html;
+                } else {
+                    // show helpful debug message when no requests found
+                    document.getElementById('pending-requests-container').innerHTML = '<div style="padding:10px;color:#777;font-size:13px;">No pending requests for this account.</div>';
+                    // if server returned an unexpected shape, print to console for debugging
+                    if (!data || !data.pending_requests) console.warn('Unexpected pending-requests payload', data);
+                }
+            } catch (err) {
+                console.error('Error fetching pending requests:', err);
+            }
+        }
+
+        function updateStats() {
+            const now = new Date();
+            const thisMonth = now.getMonth();
+            const thisYear = now.getFullYear();
+
+            let monthSent = 0, monthReceived = 0;
+
+            allTransactions.forEach(txn => {
+                const txnDate = new Date(txn.created_at);
+                if (txnDate.getMonth() === thisMonth && txnDate.getFullYear() === thisYear) {
+                    if (txn.sender_id === currentUser.wallet_id) {
+                        monthSent += parseFloat(txn.amount);
+                    }
+                    if (txn.receiver_id === currentUser.wallet_id) {
+                        monthReceived += parseFloat(txn.amount);
+                    }
+                }
+            });
+
+            const monthlySentEl = document.getElementById('monthlySent');
+            const monthlyReceivedEl = document.getElementById('monthlyReceived');
+            if (monthlySentEl) monthlySentEl.textContent = `₹${monthSent.toLocaleString()}`;
+            if (monthlyReceivedEl) monthlyReceivedEl.textContent = `₹${monthReceived.toLocaleString()}`;
+            document.getElementById('walletBalance').textContent = `₹${parseFloat(currentUser.balance).toLocaleString('en-IN', {minimumFractionDigits: 0})}`;
+        }
+
+        // Approve a pending money request
+        async function approveRequest(requestId) {
+            try {
+                const response = await fetch(`${API_BASE}/approve-request`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ request_id: requestId, user_id: currentUser.wallet_id })
+                });
+                const data = await response.json();
+                if (response.ok && data.status === 'success') {
+                    showAlert('pending-requests-container', '✓ Request approved!', 'success');
+                    // update balance
+                    currentUser.balance = data.payee_new_balance;
+                    try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e){}
+                    document.getElementById('walletBalance').textContent = `₹${parseFloat(currentUser.balance).toLocaleString()}`;
+                    fetchTransactions();
+                } else {
+                    showAlert('pending-requests-container', data.detail || 'Approval failed', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showAlert('pending-requests-container', 'Server connection failed', 'error');
+            }
+        }
+
+        
+
+        // ============= QR CODE =============
+        function generateQR() {
+            const qrContainer = document.getElementById('qr-code');
+            qrContainer.innerHTML = '';
+
+            const qrData = `${currentUser.username}|${currentUser.user_id}`;
+            new QRCode(qrContainer, {
+                text: qrData,
+                width: 250,
+                height: 250,
+                colorDark: '#667eea',
+                colorLight: '#ffffff'
+            });
+
+            document.getElementById('qr-info').textContent = `PayFlow UPI: @${currentUser.username}`;
+        }
+
+        function downloadQR() {
+            const canvas = document.querySelector('#qr-code canvas');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = `payflow-qr-${currentUser.username}.png`;
+                link.click();
+                showAlert('qr-alert', '✓ QR code downloaded!', 'success');
+            }
+        }
+
+        async function startQRScanner() {
+            const video = document.getElementById('scanner-video');
+            const startBtn = document.getElementById('start-scan-btn');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                startBtn.textContent = '⏹ Stop Camera';
+                startBtn.onclick = () => stopQRScanner();
+
+                scanQRCode(video);
+            } catch (err) {
+                showAlert('scan-alert', 'Camera access denied', 'error');
+            }
+        }
+
+        function stopQRScanner() {
+            const video = document.getElementById('scanner-video');
+            const stream = video.srcObject;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.style.display = 'none';
+                document.getElementById('start-scan-btn').textContent = '📷 Start Camera';
+                document.getElementById('start-scan-btn').onclick = startQRScanner;
+            }
+        }
+
+        function scanQRCode(video) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            const scanInterval = setInterval(() => {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0);
+
+                    try {
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+                        if (code) {
+                            clearInterval(scanInterval);
+                            const [username, userId] = code.data.split('|');
+                            document.getElementById('send-recipient').value = username;
+                            stopQRScanner();
+                            closeModal('scan-modal');
+                            openModal('send-modal');
+                            showAlert('scan-alert', `✓ Scanned: @${username}`, 'success');
+                        }
+                    } catch (e) {
+                        // QR code not found in frame yet
+                    }
+                }
+            }, 100);
+        }
+
+        function loadContacts() {
+            const contactsList = document.getElementById('contacts-list');
+            if (recentContacts.length === 0) {
+                contactsList.innerHTML = '<div style="text-align: center; padding: 30px; color: #999;"><i class="fas fa-address-book" style="font-size: 30px; margin-bottom: 10px; display: block;"></i>No recent contacts yet</div>';
+                return;
+            }
+
+            contactsList.innerHTML = recentContacts.map(contact => `
+                <div class="contact-item" onclick="selectContact('${contact.username}')">
+                    <div class="contact-avatar">${contact.name.charAt(0).toUpperCase()}</div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600;">${contact.name}</div>
+                        <div style="font-size: 12px; color: #999;">@${contact.username}</div>
+                    </div>
+                    <i class="fas fa-arrow-right" style="color: #667eea;"></i>
+                </div>
+            `).join('');
+        }
+
+        function selectContact(username) {
+            document.getElementById('send-recipient').value = username;
+            closeModal('contacts-modal');
+            openModal('send-modal');
+        }
+
+        // ============= PROFILE =============
+        function updateProfileModal() {
+            const firstLetter = currentUser.full_name.charAt(0).toUpperCase();
+            document.getElementById('profile-avatar').textContent = firstLetter;
+            document.getElementById('profile-name').textContent = currentUser.full_name;
+            document.getElementById('profile-username').textContent = `@${currentUser.username}`;
+            document.getElementById('profile-role').textContent = currentUser.role.toUpperCase();
+
+            let totalSent = 0, totalReceived = 0;
+            allTransactions.forEach(txn => {
+                if (txn.sender_id === currentUser.wallet_id) {
+                    totalSent += parseFloat(txn.amount);
+                }
+                if (txn.receiver_id === currentUser.wallet_id) {
+                    totalReceived += parseFloat(txn.amount);
+                }
+            });
+
+            document.getElementById('profile-total-sent').textContent = `₹${totalSent.toLocaleString()}`;
+            document.getElementById('profile-total-received').textContent = `₹${totalReceived.toLocaleString()}`;
+            document.getElementById('profile-total-txns').textContent = allTransactions.length;
+            document.getElementById('profile-net').textContent = `₹${parseFloat(currentUser.balance).toLocaleString()}`;
+        }
+
+        // ============= DASHBOARD UPDATE =============
+        function updateDashboard() {
+            animateBalance(parseFloat(currentUser.balance));
+            document.getElementById('walletId').textContent = `#WLT-${String(currentUser.wallet_id).padStart(4, '0')}`;
+            updateHeader();
+            fetchTransactions();
+        }
+
+        function updateHeader() {
+            try {
+                const left = document.querySelector('.header-left');
+                if (!left) {
+                    const header = document.querySelector('.header');
+                    const div = document.createElement('div');
+                    div.className = 'header-left';
+                    div.innerHTML = `<div class="header-avatar" id="topAvatar"></div><div><div class="header-title" id="topName">PayFlow</div><input class="header-search" id="topSearch" placeholder="Search transactions or contacts..." oninput="searchQuick(event)"></div>`;
+                    header.insertBefore(div, header.firstChild);
+                    document.getElementById('topSearch').addEventListener('keydown', (e)=>{ if(e.key==='Enter') searchQuick(e); });
+                }
+                const avatar = document.getElementById('topAvatar');
+                const name = document.getElementById('topName');
+                if (avatar) avatar.textContent = currentUser.full_name ? currentUser.full_name.charAt(0).toUpperCase() : currentUser.username.charAt(0).toUpperCase();
+                if (name) name.textContent = currentUser.full_name || currentUser.username;
+            } catch(e){console.warn('updateHeader failed', e)}
+        }
+
+        function searchQuick(ev){
+            const q = ev.target.value.trim();
+            if (!q) return;
+            // open transactions modal or filter list (quick client-side attempt)
+            fetch(`${API_BASE}/transactions?user_id=${currentUser.wallet_id}&q=${encodeURIComponent(q)}&limit=20`)
+                .then(r=>r.json()).then(data=>{
+                    if (data && data.transactions) {
+                        // show first 5 results in a toast for quick preview
+                        const preview = data.transactions.slice(0,5).map(t=>`${t.description} • ₹${t.amount}`).join('<br>');
+                        showAlert('auth-alerts', preview, 'success');
+                    }
+                }).catch(()=>{});
+        }
+
+        // Animate the wallet balance number for a polished feel
+        function animateBalance(target) {
+            const el = document.getElementById('walletBalance');
+            if (!el) return;
+            const start = parseFloat((el.dataset.value || '0')) || 0;
+            const end = parseFloat(target || 0);
+            el.dataset.value = end;
+            const duration = 600;
+            const startTime = performance.now();
+            function step(now) {
+                const t = Math.min(1, (now - startTime) / duration);
+                const v = Math.round(start + (end - start) * easeOutCubic(t));
+                el.textContent = `₹${v.toLocaleString('en-IN')}`;
+                if (t < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+        // Initialize; always show login on fresh open. If a stored session exists
+        // show a "Resume Session" button. If the URL hash indicates dashboard,
+        // restore session automatically.
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                const stored = localStorage.getItem('currentUser');
+                const resumeBtn = document.getElementById('resume-session-btn');
+                if (stored) {
+                    // show resume button so user can explicitly restore session
+                    if (resumeBtn) resumeBtn.style.display = 'block';
+                    // if user opened the site with #dashboard (refreshing dashboard), auto-restore
+                    if (location.hash === '#dashboard') {
+                        currentUser = JSON.parse(stored);
+                        showDashboard();
+                        return;
+                    }
+                }
+            } catch (e) { console.warn('session restore failed', e); }
+            // default: show login
+            try { history.replaceState({page:'login'}, '', '#login'); } catch(e) {}
+            switchToLogin();
+        });
+
+        // Handle back/forward navigation: when popstate occurs, switch views accordingly
+        window.addEventListener('popstate', (ev) => {
+            const state = ev.state || {};
+            const page = state.page || (location.hash ? location.hash.replace('#','') : 'login');
+            if (page === 'dashboard') {
+                if (currentUser) showDashboard();
+                else setLoginView(true);
+            } else if (page === 'register') {
+                setRegisterView(true);
+            } else {
+                setLoginView(true);
+            }
+        });
+
+        // Resume session explicitly from login page
+        function resumeSession() {
+            try {
+                const stored = localStorage.getItem('currentUser');
+                if (!stored) return showAlert('auth-alerts', 'No saved session', 'error');
+                currentUser = JSON.parse(stored);
+                if (currentUser && currentUser.user_id) {
+                    // navigate to dashboard and set hash so refresh keeps it
+                    try { history.pushState({page:'dashboard'}, '', '#dashboard'); } catch(e) {}
+                    showDashboard();
+                } else {
+                    showAlert('auth-alerts', 'Invalid saved session', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                showAlert('auth-alerts', 'Failed to resume session', 'error');
+            }
+        }
+
+        // role selector handlers
+        document.addEventListener('DOMContentLoaded', () => {
+            const userBtn = document.getElementById('role-user-btn');
+            const adminBtn = document.getElementById('role-admin-btn');
+            const roleInput = document.getElementById('login-role');
+            if (userBtn && adminBtn && roleInput) {
+                userBtn.onclick = () => { roleInput.value = 'user'; userBtn.className = 'btn'; adminBtn.className = 'btn btn-secondary'; };
+                adminBtn.onclick = () => { roleInput.value = 'admin'; adminBtn.className = 'btn'; userBtn.className = 'btn btn-secondary'; };
+            }
+        });
+
+        // Entrance and scroll-triggered animations + ripple handlers
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // initial loaded class to start CSS transitions
+                document.body.classList.add('loaded');
+
+                // stagger reveal for high-level sections
+                const toReveal = Array.from(document.querySelectorAll('.section, .action-btn, .stat-card'));
+                toReveal.forEach((el, i) => setTimeout(()=>el.classList.add('visible'), 120 * i));
+
+                // observe transactions and animate when in view
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(ent => {
+                        if (ent.isIntersecting) {
+                            ent.target.classList.add('visible');
+                            observer.unobserve(ent.target);
+                        }
+                    });
+                }, { threshold: 0.12 });
+                document.querySelectorAll('.transaction-item').forEach(t => observer.observe(t));
+
+                // ripple effect on click for interactive elements
+                document.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.modal-submit-btn, .action-btn, .wallet-action-btn, .fab, .header-icon, .scan-button, .modal .close-btn');
+                    if (!btn) return;
+                    const rect = btn.getBoundingClientRect();
+                    const r = document.createElement('span');
+                    r.className = 'ripple';
+                    const size = Math.max(rect.width, rect.height) * 0.6;
+                    r.style.width = r.style.height = size + 'px';
+                    r.style.left = (e.clientX - rect.left - size/2) + 'px';
+                    r.style.top = (e.clientY - rect.top - size/2) + 'px';
+                    btn.style.position = btn.style.position || 'relative';
+                    btn.appendChild(r);
+                    setTimeout(() => r.remove(), 700);
+                }, {passive:true});
+            } catch (e) { console.error('anim init', e); }
+        });
+
+        // Theme toggle & persistence
+        function toggleTheme() {
+            try { console.log('toggleTheme invoked'); } catch(e){}
+            try {
+                const cur = document.documentElement.getAttribute('data-theme');
+                console.log('theme - before toggle:', cur);
+                if (cur === 'dark') {
+                    document.documentElement.removeAttribute('data-theme');
+                    document.body.removeAttribute('data-theme');
+                    localStorage.setItem('theme', '');
+                    const btn = document.getElementById('theme-toggle'); if (btn) btn.textContent = '🌗';
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    document.body.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                    const btn = document.getElementById('theme-toggle'); if (btn) btn.textContent = '🌙';
+                }
+                const after = document.documentElement.getAttribute('data-theme');
+                console.log('theme - after toggle:', after, 'localStorage:', localStorage.getItem('theme'));
+            } catch (e) { console.error('toggleTheme error', e); }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                const t = localStorage.getItem('theme');
+                console.log('theme init from localStorage:', t);
+                if (t === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    document.body.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                    document.body.removeAttribute('data-theme');
+                }
+                // reflect icon state and bind click handler
+                try {
+                    const btn = document.getElementById('theme-toggle');
+                    if (btn) {
+                        btn.textContent = (t === 'dark') ? '🌙' : '🌗';
+                        btn.onclick = toggleTheme;
+                    }
+                } catch(e){}
+                console.log('theme applied to documentElement:', document.documentElement.getAttribute('data-theme'));
+            } catch(e) { console.error('theme init error', e); }
+        });
+    </script>
+</body>
+</html>

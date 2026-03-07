@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayFlow - Modern Fintech Wallet</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        /* AUTH STYLES */
+        #auth-gate {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .auth-card {
+            background: white;
+            border-radius: 25px;
+            padding: 50px 40px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .auth-header .logo {
+            font-size: 44px;
+            margin-bottom: 15px;
+        }
+
+        .auth-header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: #333;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #999;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            background: #f8f9fa;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            color: #333;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            background: white;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #bbb;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 16px;
+            letter-spacing: 0.3px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .auth-toggle {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .auth-toggle p {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .auth-toggle a {
+            color: #667eea;
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .auth-toggle a:hover {
+            text-decoration: underline;
+        }
+
+        .alert {
+            padding: 14px 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+
+        /* DASHBOARD STYLES */
+        #dashboard {
+            display: none;
+        }
+
+        .dashboard-background {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-top: 20px;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .header-left h2 {
+            font-size: 22px;
+            color: white;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .header-info {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 13px;
+        }
+
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
+        /* WALLET CARD */
+        .wallet-card {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+            border-radius: 20px;
+            padding: 35px;
+            margin-bottom: 30px;
+            color: #333;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .wallet-card::before {
+            content: '';
+            position: absolute;
+            top: -80px;
+            right: -80px;
+            width: 250px;
+            height: 250px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+        }
+
+        .wallet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .wallet-info h3 {
+            font-size: 13px;
+            color: #999;
+            margin-bottom: 5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .wallet-id {
+            font-size: 12px;
+            color: #bbb;
+            font-weight: 500;
+        }
+
+        .user-role {
+            font-size: 11px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 7px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .wallet-balance {
+            font-size: 52px;
+            font-weight: 800;
+            margin: 15px 0;
+            color: #333;
+            position: relative;
+            z-index: 1;
+            letter-spacing: -1px;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-top: 25px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .action-btn {
+            background: white;
+            border: none;
+            padding: 20px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            font-weight: 700;
+            font-size: 12px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            color: #333;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .action-btn i {
+            font-size: 32px;
+            display: block;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .action-btn:hover i {
+            -webkit-text-fill-color: white;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 28px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .card h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+            font-weight: 700;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+        }
+
+        .transaction-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group-inline {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group-inline label {
+            color: #666;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .form-group-inline input,
+        .form-group-inline select {
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            color: #333;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .form-group-inline input:focus,
+        .form-group-inline select:focus {
+            outline: none;
+            background: white;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #receiver-field {
+            display: none;
+        }
+
+        .transaction-alert {
+            margin-bottom: 15px;
+        }
+
+        /* TRANSACTION HISTORY */
+        .transaction-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .transaction-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: all 0.3s;
+        }
+
+        .transaction-item:hover {
+            background: #f8f9fa;
+        }
+
+        .txn-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .txn-debit-icon {
+            background: #ffe0e0;
+            color: #d32f2f;
+        }
+
+        .txn-credit-icon {
+            background: #e0ffe0;
+            color: #388e3c;
+        }
+
+        .txn-details {
+            flex: 1;
+        }
+
+        .txn-description {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .txn-info {
+            color: #999;
+            font-size: 12px;
+        }
+
+        .txn-amount {
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .txn-amount.debit {
+            color: #d32f2f;
+        }
+
+        .txn-amount.credit {
+            color: #388e3c;
+        }
+
+        /* STATS */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #f0f2f7 100%);
+            border-radius: 12px;
+            padding: 20px 15px;
+            text-align: center;
+        }
+
+        .stat-card .label {
+            color: #999;
+            font-size: 11px;
+            margin-bottom: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .stat-card .value {
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* RESPONSIVENESS */
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .quick-actions {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .wallet-card {
+                padding: 25px;
+            }
+
+            .wallet-balance {
+                font-size: 42px;
+            }
+
+            .quick-actions {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .action-btn {
+                padding: 15px 10px;
+                font-size: 11px;
+            }
+
+            .action-btn i {
+                font-size: 26px;
+                margin-bottom: 8px;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            .card h3 {
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .auth-card {
+                padding: 30px 20px;
+            }
+
+            .quick-actions {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .wallet-balance {
+                font-size: 36px;
+            }
+        }
+
+        /* SCROLLBAR */
+        .transaction-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .transaction-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .transaction-list::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 3px;
+        }
+
+        .transaction-list::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+    </style>
+</head>
+<body>
+    <!-- AUTH GATE -->
+    <div id="auth-gate">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo">💳</div>
+                <h1>PayFlow</h1>
+                <p class="subtitle">Next-Gen Digital Wallet</p>
+            </div>
+
+            <!-- LOGIN FORM -->
+            <div id="login-form">
+                <div id="login-alert"></div>
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> Username</label>
+                    <input type="text" id="login-username" placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> Password</label>
+                    <input type="password" id="login-password" placeholder="Enter your password">
+                </div>
+                <button class="btn" onclick="login()">Access PayFlow</button>
+                <div class="auth-toggle">
+                    <p>New to PayFlow?</p>
+                    <a onclick="showRegister()">Create Account</a>
+                </div>
+            </div>
+
+            <!-- REGISTER FORM -->
+            <div id="register-form" style="display: none;">
+                <div id="register-alert"></div>
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> Username</label>
+                    <input type="text" id="reg-username" placeholder="Choose a username">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-id-card"></i> Full Name</label>
+                    <input type="text" id="reg-fullname" placeholder="Your full name">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> Password</label>
+                    <input type="password" id="reg-password" placeholder="Create a password">
+                </div>
+                <button class="btn" onclick="register()">Create Account</button>
+                <div class="auth-toggle">
+                    <p>Already have an account?</p>
+                    <a onclick="showLogin()">Sign In</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard">
+        <div class="dashboard-background">
+            <div class="container">
+                <!-- HEADER -->
+                <div class="dashboard-header">
+                    <div class="header-left">
+                        <h2><i class="fas fa-wallet"></i> PayFlow</h2>
+                        <div class="header-info" id="userFullName"></div>
+                    </div>
+                    <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+
+                <!-- WALLET CARD -->
+                <div class="wallet-card">
+                    <div class="wallet-header">
+                        <div class="wallet-info">
+                            <h3>Your Balance</h3>
+                            <div class="wallet-id" id="walletId"></div>
+                        </div>
+                        <div class="user-role" id="userRole"></div>
+                    </div>
+                    <div class="wallet-balance" id="walletBalance">₹0.00</div>
+                    
+                    <div class="quick-actions">
+                        <button class="action-btn" onclick="openModal('send-modal')">
+                            <i class="fas fa-arrow-right"></i>
+                            Send
+                        </button>
+                        <button class="action-btn" onclick="openModal('request-modal')">
+                            <i class="fas fa-arrow-left"></i>
+                            Request
+                        </button>
+                        <button class="action-btn" onclick="openModal('add-money-modal')">
+                            <i class="fas fa-plus"></i>
+                            Add Money
+                        </button>
+                        <button class="action-btn" onclick="openModal('withdraw-modal')">
+                            <i class="fas fa-money-bill"></i>
+                            Withdraw
+                        </button>
+                        <button class="action-btn" onclick="openModal('history-modal')">
+                            <i class="fas fa-history"></i>
+                            History
+                        </button>
+                    </div>
+                </div>
+
+                <!-- MAIN CONTENT -->
+                <div class="main-grid">
+                    <!-- RECENT TRANSACTIONS -->
+                    <div class="card">
+                        <h3><i class="fas fa-exchange-alt"></i> Recent Transactions</h3>
+                        <div class="transaction-list" id="recent-transactions">
+                            <div class="transaction-item">
+                                <div class="txn-icon txn-credit-icon">+</div>
+                                <div class="txn-details">
+                                    <div class="txn-description">No transactions yet</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STATS -->
+                    <div class="card">
+                        <h3><i class="fas fa-chart-pie"></i> Statistics</h3>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="label">Total Transactions</div>
+                                <div class="value" id="totalTransactions">0</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="label">This Month</div>
+                                <div class="value" id="monthlyChange">₹0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    
+    <!-- SEND MONEY MODAL -->
+    <div id="send-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-arrow-right"></i> Send Money</h3>
+                <button class="close-btn" onclick="closeModal('send-modal')">&times;</button>
+            </div>
+            <div id="send-alert"></div>
+            <div class="transaction-form">
+                <div class="form-group-inline">
+                    <label>Recipient Username</label>
+                    <input type="text" id="send-recipient" placeholder="Enter recipient username">
+                </div>
+                <div class="form-group-inline">
+                    <label>Amount</label>
+                    <input type="number" id="send-amount" placeholder="0.00" min="0" step="0.01">
+                </div>
+                <div class="form-group-inline">
+                    <label>Description</label>
+                    <input type="text" id="send-description" placeholder="What is this for?">
+                </div>
+                <button class="btn" onclick="sendMoney()"><i class="fas fa-arrow-right"></i> Send Money</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- REQUEST MONEY MODAL -->
+    <div id="request-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-arrow-left"></i> Request Money</h3>
+                <button class="close-btn" onclick="closeModal('request-modal')">&times;</button>
+            </div>
+            <div id="request-alert"></div>
+            <div class="transaction-form">
+                <div class="form-group-inline">
+                    <label>From Username</label>
+                    <input type="text" id="request-from" placeholder="Enter username to request from">
+                </div>
+                <div class="form-group-inline">
+                    <label>Amount</label>
+                    <input type="number" id="request-amount" placeholder="0.00" min="0" step="0.01">
+                </div>
+                <div class="form-group-inline">
+                    <label>Reason</label>
+                    <input type="text" id="request-reason" placeholder="Why do you need this?">
+                </div>
+                <div style="background: #f0f0f0; padding: 15px; border-radius: 10px; margin-top: 10px;">
+                    <i class="fas fa-info-circle"></i> <small>Send them a payment request they can approve</small>
+                </div>
+                <button class="btn" onclick="requestMoney()" style="margin-top: 20px;"><i class="fas fa-arrow-left"></i> Send Request</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD MONEY MODAL -->
+    <div id="add-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus"></i> Add Money</h3>
+                <button class="close-btn" onclick="closeModal('add-modal')">&times;</button>
+            </div>
+            <div id="add-alert"></div>
+            <div class="transaction-form">
+                <div class="form-group-inline">
+                    <label>Amount</label>
+                    <input type="number" id="add-amount" placeholder="0.00" min="0" step="0.01">
+                </div>
+                <div class="form-group-inline">
+                    <label>Description</label>
+                    <input type="text" id="add-description" placeholder="Optional note" value="Added funds">
+                </div>
+                <div style="background: #e0ffe0; padding: 15px; border-radius: 10px; margin-top: 10px; color: #388e3c;">
+                    <i class="fas fa-check-circle"></i> <small>Funds will be added instantly to your wallet</small>
+                </div>
+                <button class="btn" onclick="addMoney()" style="margin-top: 20px;"><i class="fas fa-plus"></i> Add Funds</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WITHDRAW MODAL -->
+    <div id="withdraw-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-money-bill"></i> Withdraw Money</h3>
+                <button class="close-btn" onclick="closeModal('withdraw-modal')">&times;</button>
+            </div>
+            <div id="withdraw-alert"></div>
+            <div class="transaction-form">
+                <div style="background: #fff3cd; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <i class="fas fa-wallet"></i> Available Balance: <strong>₹<span id="available-balance">0</span></strong>
+                </div>
+                <div class="form-group-inline">
+                    <label>Amount to Withdraw</label>
+                    <input type="number" id="withdraw-amount" placeholder="0.00" min="0" step="0.01">
+                </div>
+                <div class="form-group-inline">
+                    <label>Description</label>
+                    <input type="text" id="withdraw-description" placeholder="Where are you withdrawing to?" value="Withdrawal">
+                </div>
+                <button class="btn" onclick="withdrawMoney()" style="margin-top: 20px;"><i class="fas fa-money-bill"></i> Withdraw</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HISTORY MODAL -->
+    <div id="history-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-history"></i> Transaction History</h3>
+                <button class="close-btn" onclick="closeModal('history-modal')">&times;</button>
+            </div>
+            <div class="transaction-list" id="full-history" style="max-height: 600px;">
+                <!-- Will be filled by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .modal-header h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            transition: all 0.3s;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+    </style>
+
+    <script>
+        // Handle clicking outside modal
+        document.addEventListener('click', function(event) {
+            const modals = document.querySelectorAll('.modal.active');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Update available balance when opening withdraw modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const withdrawBtn = document.querySelector('.action-btn:nth-child(4)');
+            if (withdrawBtn) {
+                withdrawBtn.addEventListener('click', function() {
+                    if (currentUser) {
+                        document.getElementById('available-balance').textContent = 
+                            parseFloat(currentUser.balance).toLocaleString();
+                    }
+                });
+            }
+        });
+
+        let currentUser = null;
+        const API_BASE = 'http://localhost:8080/api';
+
+        function showAlert(elementId, message, type = 'error') {
+            const alertEl = document.getElementById(elementId);
+            alertEl.innerHTML = `<div class="alert alert-${type === 'success' ? 'success' : 'error'}">${message}</div>`;
+            setTimeout(() => { alertEl.innerHTML = ''; }, 5000);
+        }
+
+        function showLogin() {
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('register-form').style.display = 'none';
+        }
+
+        function showRegister() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'block';
+        }
+
+        async function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            if (!username || !password) {
+                showAlert('login-alert', 'Please fill in all fields');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    currentUser = data.user;
+                    loadDashboard();
+                } else {
+                    showAlert('login-alert', data.detail || 'Login failed');
+                }
+            } catch (err) {
+                console.error(err);
+                showAlert('login-alert', 'Server connection failed');
+            }
+        }
+
+        async function register() {
+            const username = document.getElementById('reg-username').value;
+            const fullname = document.getElementById('reg-fullname').value;
+            const password = document.getElementById('reg-password').value;
+
+            if (!username || !fullname || !password) {
+                showAlert('register-alert', 'Please fill in all fields');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, full_name: fullname })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    showAlert('register-alert', 'Account created successfully! Please login.', 'success');
+                    showLogin();
+                } else {
+                    showAlert('register-alert', data.detail || 'Registration failed');
+                }
+            } catch (err) {
+                console.error(err);
+                showAlert('register-alert', 'Server connection failed');
+            }
+        }
+
+        function loadDashboard() {
+            document.getElementById('auth-gate').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+
+            document.getElementById('userFullName').textContent = `Welcome, ${currentUser.full_name}`;
+            document.getElementById('userRole').textContent = currentUser.role.toUpperCase();
+            document.getElementById('walletBalance').textContent = `₹${parseFloat(currentUser.balance).toLocaleString()}`;
+            document.getElementById('walletId').textContent = `#WLT-${String(currentUser.wallet_id).padStart(4, '0')}`;
+
+            fetchTransactions();
+            fetchPendingRequests();
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('auth-gate').style.display = 'flex';
+            document.getElementById('login-username').value = '';
+            document.getElementById('login-password').value = '';
+            showLogin();
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        async function sendMoney() {
+            const recipient = document.getElementById('send-recipient').value;
+            const amount = parseFloat(document.getElementById('send-amount').value);
+            const description = document.getElementById('send-description').value;
+
+            if (!recipient || !amount || amount <= 0 || !description) {
+                showAlert('send-alert', 'Please fill in all fields');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/transaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.user_id,
+                        transaction_type: 'transfer',
+                        amount,
+                        description,
+                        receiver_username: recipient
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    showAlert('send-alert', '✓ Money sent successfully!', 'success');
+                    currentUser.balance = data.new_balance;
+                    document.getElementById('walletBalance').textContent = `₹${parseFloat(data.new_balance).toLocaleString()}`;
+                    
+                    // Clear form
+                    document.getElementById('send-recipient').value = '';
+                    document.getElementById('send-amount').value = '';
+                    document.getElementById('send-description').value = '';
+                    
+                    setTimeout(() => closeModal('send-modal'), 2000);
+                    fetchTransactions();
+                } else {
+                    showAlert('send-alert', data.detail || 'Transaction failed');
+                }
+            } catch (err) {
+                console.error(err);
+                showAlert('send-alert', 'Server connection failed');
+            }
+        }
+
+        async function addMoney() {
+            const amount = parseFloat(document.getElementById('add-amount').value);
+            const description = document.getElementById('add-description').value || 'Added funds';
+
+            if (!amount || amount <= 0) {
+                showAlert('add-alert', 'Please enter a valid amount');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/transaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.user_id,
+                        transaction_type: 'deposit',
+                        amount,
+                        description
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    showAlert('add-alert', `✓ ₹${amount.toLocaleString()} added to your wallet!`, 'success');
+                    currentUser.balance = data.new_balance;
+                    document.getElementById('walletBalance').textContent = `₹${parseFloat(data.new_balance).toLocaleString()}`;
+                    
+                    document.getElementById('add-amount').value = '';
+                    document.getElementById('add-description').value = '';
+                    
+                    setTimeout(() => closeModal('add-modal'), 2000);
+                    fetchTransactions();
+                } else {
+                    showAlert('add-alert', data.detail || 'Failed to add money');
+                }
+            } catch (err) {
+                console.error(err);
+                showAlert('add-alert', 'Server connection failed');
+            }
+        }
+
+        async function withdrawMoney() {
+            const amount = parseFloat(document.getElementById('withdraw-amount').value);
+            const description = document.getElementById('withdraw-description').value || 'Withdrawal';
+
+            if (!amount || amount <= 0) {
+                showAlert('withdraw-alert', 'Please enter a valid amount');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/transaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.user_id,
+                        transaction_type: 'withdraw',
+                        amount,
+                        description
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    showAlert('withdraw-alert', `✓ ₹${amount.toLocaleString()} withdrawn successfully!`, 'success');
+                    currentUser.balance = data.new_balance;
+                    document.getElementById('walletBalance').textContent = `₹${parseFloat(data.new_balance).toLocaleString()}`;
+                    
+                    document.getElementById('withdraw-amount').value = '';
+                    document.getElementById('withdraw-description').value = '';
+                    
+                    setTimeout(() => closeModal('withdraw-modal'), 2000);
+                    fetchTransactions();
+                } else {
+                    showAlert('withdraw-alert', data.detail || 'Withdrawal failed');
+                }
+            } catch (err) {
+                console.error(err);
+                showAlert('withdraw-alert', 'Server connection failed');
+            }
+        }
+
+        async function requestMoney() {
+            const fromUsername = document.getElementById('request-from').value;
+            const amount = parseFloat(document.getElementById('request-amount').value);
+            const reason = document.getElementById('request-reason').value || 'Money request';
+
+            if (!fromUsername || !amount || amount <= 0) {
+                showAlert('request-alert', 'Please fill in all fields');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/transaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.user_id,
+                        transaction_type: 'request_money',
+                        amount,
+                        description: reason,
+                        receiver_username: fromUsername
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    showAlert('request-alert', `✓ Money request sent to ${fromUsername}!`, 'success');
+                    
+                    document.getElementById('request-from').value = '';
+                    document.getElementById('request-amount').value = '';
+                    document.getElementById('request-reason').value = '';
+                    
+                    setTimeout(() => closeModal('request-modal'), 2000);
+                    fetchTransactions();
+                } else {
+                    showAlert('request-alert', data.detail || 'Failed to send request');
+                }
+            } catch (err) {
+                console.error(err);
+                showAlert('request-alert', 'Server connection failed');
+            }
+        }
+
+        async function fetchPendingRequests() {
+            try {
+                const response = await fetch(`${API_BASE}/pending-requests/${currentUser.wallet_id}`);
+                const data = await response.json();
+
+                if (response.ok && data.pending_requests.length > 0) {
+                    // Create or update pending requests display
+                    let requestsHtml = '<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 10px; padding: 15px; margin-bottom: 20px;">';
+                    requestsHtml += '<i class="fas fa-bell" style="color: #ff9800;"></i> <strong>Pending Money Requests:</strong><br>';
+                    
+                    data.pending_requests.forEach(req => {
+                        requestsHtml += `<div style="padding: 10px 0; border-bottom: 1px solid #ffc10744;">
+                            <strong>${req.from_name}</strong> (@${req.from_user}) is requesting <strong>₹${parseFloat(req.amount).toLocaleString()}</strong>
+                            <div style="font-size: 12px; color: #666;">${req.reason}</div>
+                        </div>`;
+                    });
+                    
+                    requestsHtml += '</div>';
+                    
+                    // Insert at the top of the transaction list or create a container
+                    const container = document.getElementById('pending-requests-container');
+                    if (container) {
+                        container.innerHTML = requestsHtml;
+                    } else {
+                        // Create container if doesn't exist
+                        const dashboardContent = document.querySelector('.dashboard-content');
+                        if (dashboardContent) {
+                            const div = document.createElement('div');
+                            div.id = 'pending-requests-container';
+                            div.innerHTML = requestsHtml;
+                            dashboardContent.insertBefore(div, dashboardContent.querySelector('.stats-grid'));
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching pending requests:', err);
+            }
+        }
+
+        async function fetchTransactions() {
+            try {
+                const response = await fetch(`${API_BASE}/ledger/${currentUser.wallet_id}`);
+                const data = await response.json();
+
+                const container = document.getElementById('recent-transactions');
+                if (data.transactions.length === 0) {
+                    container.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">No transactions yet</div>';
+                    return;
+                }
+
+                container.innerHTML = data.transactions.slice(0, 8).map(txn => {
+                    const isDebit = txn.sender_id === currentUser.wallet_id;
+                    const counterparty = isDebit ? txn.receiver_name : txn.sender_name;
+                    const txnType = isDebit ? 'debit' : 'credit';
+
+                    return `
+                        <div class="transaction-item">
+                            <div class="txn-icon txn-${txnType}-icon">${isDebit ? '-' : '+'}</div>
+                            <div class="txn-details">
+                                <div class="txn-description">${txn.description}</div>
+                                <div class="txn-info">${counterparty || 'System'} • ${new Date(txn.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <div class="txn-amount ${txnType}">${isDebit ? '-' : '+'}₹${parseFloat(txn.amount).toLocaleString()}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                // Update stats
+                document.getElementById('totalTransactions').textContent = data.transactions.length;
+
+                const thisMonth = new Date().getMonth();
+                const thisMonthTxns = data.transactions.filter(txn =>
+                    new Date(txn.created_at).getMonth() === thisMonth
+                );
+                const monthlyChange = thisMonthTxns.reduce((sum, txn) => {
+                    const isDebit = txn.sender_id === currentUser.wallet_id;
+                    return sum + (isDebit ? -parseFloat(txn.amount) : parseFloat(txn.amount));
+                }, 0);
+                document.getElementById('monthlyChange').textContent = `₹${monthlyChange.toLocaleString()}`;
+                
+                // Also fetch pending requests
+                fetchPendingRequests();
+            } catch (err) {
+                console.error('Error fetching transactions:', err);
+            }
+        }
+    </script>
+</body>
+</html>
