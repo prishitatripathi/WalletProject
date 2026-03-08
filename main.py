@@ -61,7 +61,7 @@ else:
 # Get cursor function
 def get_cursor(conn):
     if SQL_DIALECT == 'postgres':
-        return conn.cursor(cursor=psycopg2.extras.RealDictCursor)
+        return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     else:
         return conn.cursor()
 
