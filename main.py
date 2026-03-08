@@ -22,11 +22,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Get database config from environment variables (for cloud deployment)
 DB_CONFIG = {
-    'host': '127.0.0.1',
-    'user': 'root',
-    'password': '1704', # Ensure this matches your MySQL root password
-    'database': 'wallet_db'
+    'host': os.environ.get('DB_HOST', '127.0.0.1'),
+    'user': os.environ.get('DB_USER', 'root'),
+    'password': os.environ.get('DB_PASSWORD', '1704'),
+    'database': os.environ.get('DB_NAME', 'wallet_db')
 }
 
 # initialize additional tables if they don't exist
@@ -825,7 +826,8 @@ async def serve_index():
     return FileResponse("index.html")
 
 if __name__ == "__main__":
-    print("Starting PayFlow Backend on port 8080...")
+    port = int(os.environ.get("PORT", 8080))
+    print(f"Starting PayFlow Backend on port {port}...")
     print("✨ Modern Fintech Wallet API")
-    print("http://localhost:8080")
-    uvicorn.run(app, host="127.0.0.1", port=8080)
+    print(f"http://localhost:{port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
