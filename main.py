@@ -131,6 +131,71 @@ def init_db():
         
         conn.commit()
         print("Database initialized successfully")
+        
+        # Create test users if they don't exist
+        cursor.execute("SELECT COUNT(*) as count FROM users")
+        if cursor.fetchone()['count'] == 0:
+            # Insert test users with hashed passwords (password = "password")
+            admin_hash = generate_password_hash("password")
+            alice_hash = generate_password_hash("password")
+            bob_hash = generate_password_hash("password")
+            
+            if SQL_DIALECT == 'postgres':
+                cursor.execute("""
+                    INSERT INTO users (username, password_hash, full_name, role) VALUES 
+                    (%s, %s, %s, %s), (%s, %s, %s, %s), (%s, %s, %s, %s) RETURNING user_id
+                """, ('admin', admin_hash, 'System Administrator', 'admin',
+                      'alice', alice_hash, 'Alice Vance', 'user',
+                      'bob', bob_hash, 'Robert Fox', 'user'))
+                users_result = cursor.fetchall()
+                
+                # Create wallets for each user
+                for user in users_result:
+                    cursor.execute("INSERT INTO wallets (user_id, balance) VALUES (%s, %s)", 
+                                  (user['user_id'], 1000.00))
+                
+                # Add some initial transactions
+                cursor.execute("SELECT wallet_id FROM users WHERE username = 'admin'")
+                admin_wallet = cursor.fetchone()
+                cursor.execute("SELECT wallet_id FROM users WHERE username = 'alice'")
+                alice_wallet = cursor.fetchone()
+                
+                if admin_wallet and alice_wallet:
+                    cursor.execute("""
+                        INSERT INTO transactions (sender_id, receiver_id, amount, description)
+                        VALUES (%s, %s, %s, %s)
+                    """, (admin_wallet['wallet_id'], alice_wallet['wallet_id'], 500.00, 'Welcome Bonus'))
+            else:
+                cursor.execute("""
+                    INSERT INTO users (username, password_hash, full_name, role) VALUES 
+                    (%s, %s, %s, %s), (%s, %s, %s, %s), (%s, %s, %s, %s)
+                """, ('admin', admin_hash, 'System Administrator', 'admin',
+                      'alice', alice_hash, 'Alice Vance', 'user',
+                      'bob', bob_hash, 'Robert Fox', 'user'))
+                
+                # Get user IDs
+                cursor.execute("SELECT user_id FROM users ORDER BY user_id")
+                user_ids = cursor.fetchall()
+                
+                # Create wallets
+                for uid in user_ids:
+                    cursor.execute("INSERT INTO wallets (user_id, balance) VALUES (%s, %s)", 
+                                  (uid['user_id'], 1000.00))
+                
+                # Add initial transactions
+                cursor.execute("SELECT wallet_id FROM wallets WHERE user_id = 1")
+                admin_wallet = cursor.fetchone()
+                cursor.execute("SELECT wallet_id FROM wallets WHERE user_id = 2")
+                alice_wallet = cursor.fetchone()
+                
+                if admin_wallet and alice_wallet:
+                    cursor.execute("""
+                        INSERT INTO transactions (sender_id, receiver_id, amount, description)
+                        VALUES (%s, %s, %s, %s)
+                    """, (admin_wallet['wallet_id'], alice_wallet['wallet_id'], 500.00, 'Welcome Bonus'))
+            
+            conn.commit()
+            print("Test users created: admin, alice, bob (password: password)")
     except Exception as e:
         print(f"DB init error: {e}")
     finally:
