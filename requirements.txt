@@ -3,3 +3,4 @@ uvicorn
 pymysql
 werkzeug
 python-dotenv
+psycopg2-binary

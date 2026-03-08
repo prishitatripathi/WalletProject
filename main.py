@@ -1,10 +1,9 @@
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-import pymysql
-import pymysql.cursors
 import uvicorn
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
@@ -27,6 +26,8 @@ app.add_middleware(
 )
 
 # Get database config from environment variables (for cloud deployment)
+DB_TYPE = os.environ.get('DB_TYPE', 'mysql').lower()
+
 DB_CONFIG = {
     'host': os.environ.get('DB_HOST', '127.0.0.1'),
     'user': os.environ.get('DB_USER', 'root'),
@@ -34,34 +35,109 @@ DB_CONFIG = {
     'database': os.environ.get('DB_NAME', 'wallet_db')
 }
 
-# initialize additional tables if they don't exist
+# Import appropriate database library based on DB_TYPE
+if DB_TYPE == 'postgres' or DB_TYPE == 'postgresql':
+    import psycopg2
+    import psycopg2.extras
+    def get_db_connection():
+        conn = psycopg2.connect(
+            host=DB_CONFIG['host'],
+            user=DB_CONFIG['user'],
+            password=DB_CONFIG['password'],
+            database=DB_CONFIG['database']
+        )
+        return conn
+    SQL_DIALECT = 'postgres'
+    print("Using PostgreSQL database")
+else:
+    # Default to MySQL
+    import pymysql
+    import pymysql.cursors
+    def get_db_connection():
+        return pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
+    SQL_DIALECT = 'mysql'
+    print("Using MySQL database")
 
+# Get cursor function
+def get_cursor(conn):
+    if SQL_DIALECT == 'postgres':
+        return conn.cursor(cursor=psycopg2.extras.RealDictCursor)
+    else:
+        return conn.cursor()
+
+# Initialize database tables
 def init_db():
     conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS money_requests (
-                request_id INT AUTO_INCREMENT PRIMARY KEY,
-                requester_id INT NOT NULL,
-                payee_id INT NOT NULL,
-                amount DECIMAL(15,2) NOT NULL,
-                description VARCHAR(255),
-                status ENUM('pending','approved','denied') NOT NULL DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (requester_id) REFERENCES wallets(wallet_id),
-                FOREIGN KEY (payee_id) REFERENCES wallets(wallet_id)
-            ) ENGINE=InnoDB;
-        """)
+        conn = get_db_connection()
+        cursor = get_cursor(conn)
+        
+        if SQL_DIALECT == 'postgres':
+            # PostgreSQL schema
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id SERIAL PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    full_name VARCHAR(100) NOT NULL,
+                    role VARCHAR(20) DEFAULT 'user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS wallets (
+                    wallet_id SERIAL PRIMARY KEY,
+                    user_id INT NOT NULL UNIQUE,
+                    balance DECIMAL(18, 2) DEFAULT 0.00,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS transactions (
+                    txn_id SERIAL PRIMARY KEY,
+                    sender_id INT,
+                    receiver_id INT,
+                    amount DECIMAL(18, 2) NOT NULL,
+                    description VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS money_requests (
+                    request_id SERIAL PRIMARY KEY,
+                    requester_id INT NOT NULL,
+                    payee_id INT NOT NULL,
+                    amount DECIMAL(15,2) NOT NULL,
+                    description VARCHAR(255),
+                    status VARCHAR(20) DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        else:
+            # MySQL schema
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS money_requests (
+                    request_id INT AUTO_INCREMENT PRIMARY KEY,
+                    requester_id INT NOT NULL,
+                    payee_id INT NOT NULL,
+                    amount DECIMAL(15,2) NOT NULL,
+                    description VARCHAR(255),
+                    status ENUM('pending','approved','denied') NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (requester_id) REFERENCES wallets(wallet_id),
+                    FOREIGN KEY (payee_id) REFERENCES wallets(wallet_id)
+                ) ENGINE=InnoDB
+            """)
+        
         conn.commit()
+        print("Database initialized successfully")
     except Exception as e:
         print(f"DB init error: {e}")
     finally:
         if conn:
             conn.close()
 
-# call init on startup
+# Initialize on startup
 init_db()
 
 class LoginRequest(BaseModel):
@@ -78,52 +154,64 @@ class TransactionRequest(BaseModel):
     receiver_username: Optional[str] = None
     amount: float
     description: str
-    transaction_type: str  # 'deposit', 'withdraw', 'transfer', 'request_money'
+    transaction_type: str
 
 class ApproveRequest(BaseModel):
     request_id: int
-    user_id: int  # the payee approving the request
-
+    user_id: int
 
 class ReverseRequest(BaseModel):
     transaction_id: int
-    user_id: int  # the wallet_id of the user requesting reversal (must be sender)
+    user_id: int
+
+def execute_query(query, params=None, fetch=True):
+    """Helper function to execute queries with the correct database"""
+    conn = get_db_connection()
+    cursor = get_cursor(conn)
+    try:
+        cursor.execute(query, params or ())
+        if fetch:
+            result = cursor.fetchall()
+            conn.commit()
+            return result
+        else:
+            conn.commit()
+            return cursor.lastrowid
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cursor.close()
+        conn.close()
 
 @app.post("/api/login")
 async def login(req: LoginRequest):
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-
-        # Get user with password hash
-        cursor.execute("""
+        query = """
             SELECT u.user_id, u.username, u.full_name, u.role, u.password_hash, w.wallet_id
             FROM users u
             JOIN wallets w ON u.user_id = w.user_id
             WHERE u.username = %s
-        """, (req.username,))
-
-        user = cursor.fetchone()
-
-        if user and check_password_hash(user['password_hash'], req.password):
+        """
+        users = execute_query(query, (req.username,))
+        if not users:
+            raise HTTPException(status_code=401, detail="Invalid Credentials")
+        
+        user = users[0]
+        if 'password_hash' in user and check_password_hash(user['password_hash'], req.password):
             # Get calculated balance
-            cursor.execute("""
-                SELECT COALESCE(SUM(CASE WHEN t.receiver_id = w.wallet_id THEN t.amount ELSE 0 END), 0) -
-                       COALESCE(SUM(CASE WHEN t.sender_id = w.wallet_id THEN t.amount ELSE 0 END), 0) as balance
-                FROM wallets w
-                LEFT JOIN transactions t ON t.sender_id = w.wallet_id OR t.receiver_id = w.wallet_id
-                WHERE w.wallet_id = %s
-                GROUP BY w.wallet_id
-            """, (user['wallet_id'],))
+            balance_query = """
+                SELECT COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END), 0) -
+                       COALESCE(SUM(CASE WHEN sender_id = %s THEN amount ELSE 0 END), 0) as balance
+                FROM transactions
+                WHERE sender_id = %s OR receiver_id = %s
+            """
+            balance_results = execute_query(balance_query, (user['wallet_id'], user['wallet_id'], user['wallet_id'], user['wallet_id']))
+            balance = float(balance_results[0]['balance']) if balance_results else 0.0
             
-            balance_result = cursor.fetchone()
-            balance = float(balance_result['balance']) if balance_result else 0.0
-
             # Update stored balance
-            cursor.execute("UPDATE wallets SET balance = %s WHERE wallet_id = %s", (balance, user['wallet_id']))
-            conn.commit()
-
+            execute_query("UPDATE wallets SET balance = %s WHERE wallet_id = %s", (balance, user['wallet_id']), fetch=False)
+            
             return {
                 "status": "success",
                 "user": {
@@ -135,105 +223,91 @@ async def login(req: LoginRequest):
                     "balance": balance
                 }
             }
-
         raise HTTPException(status_code=401, detail="Invalid Credentials")
-
     except HTTPException:
         raise
     except Exception as err:
         print(f"Database Error: {err}")
         raise HTTPException(status_code=500, detail="Database connection failed")
-    finally:
-        if conn:
-            conn.close()
 
 @app.post("/api/register")
 async def register(req: RegisterRequest):
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-
-        # Check if username already exists
-        cursor.execute("SELECT user_id FROM users WHERE username = %s", (req.username,))
-        if cursor.fetchone():
+        # Check if username exists
+        users = execute_query("SELECT user_id FROM users WHERE username = %s", (req.username,))
+        if users:
             raise HTTPException(status_code=400, detail="Username already exists")
-
+        
         # Hash password
         password_hash = generate_password_hash(req.password)
-
+        
         # Insert user
-        cursor.execute(
-            "INSERT INTO users (username, password_hash, full_name) VALUES (%s, %s, %s)",
-            (req.username, password_hash, req.full_name)
-        )
-        user_id = cursor.lastrowid
-
+        if SQL_DIALECT == 'postgres':
+            user_id = execute_query(
+                "INSERT INTO users (username, password_hash, full_name) VALUES (%s, %s, %s) RETURNING user_id",
+                (req.username, password_hash, req.full_name)
+            )
+            user_id = user_id[0]['user_id'] if user_id else None
+        else:
+            execute_query(
+                "INSERT INTO users (username, password_hash, full_name) VALUES (%s, %s, %s)",
+                (req.username, password_hash, req.full_name)
+            )
+            # Get the last insert id
+            result = execute_query("SELECT LAST_INSERT_ID() as user_id")
+            user_id = result[0]['user_id']
+        
         # Create wallet
-        cursor.execute("INSERT INTO wallets (user_id) VALUES (%s)", (user_id,))
-
-        conn.commit()
+        execute_query("INSERT INTO wallets (user_id) VALUES (%s)", (user_id,))
+        
         return {"status": "success", "message": "User registered successfully"}
-
     except HTTPException:
         raise
     except Exception as err:
         print(f"Registration Error: {err}")
         raise HTTPException(status_code=500, detail="Registration failed")
-    finally:
-        if conn:
-            conn.close()
 
 @app.post("/api/transaction")
 async def create_transaction(req: TransactionRequest):
-    conn = None
+    conn = get_db_connection()
+    cursor = get_cursor(conn)
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-
         # Get user's wallet
         cursor.execute("SELECT wallet_id FROM wallets WHERE user_id = %s", (req.user_id,))
         wallet = cursor.fetchone()
         if not wallet:
             raise HTTPException(status_code=404, detail="Wallet not found")
-
+        
         wallet_id = wallet['wallet_id']
-        receiver_wallet_id = None  # Track receiver for transfers
-
-        # Get current balance from transaction history (ignore pending requests)
+        receiver_wallet_id = None
+        
+        # Get current balance
         cursor.execute("""
             SELECT COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END), 0) -
                    COALESCE(SUM(CASE WHEN sender_id = %s THEN amount ELSE 0 END), 0) as current_balance
             FROM transactions
-            WHERE (sender_id = %s OR receiver_id = %s)
+            WHERE sender_id = %s OR receiver_id = %s
         """, (wallet_id, wallet_id, wallet_id, wallet_id))
         
         balance_result = cursor.fetchone()
         current_balance = float(balance_result['current_balance']) if balance_result else 0.0
-
+        
         if req.transaction_type == 'deposit':
-            # Deposit: insert transaction with receiver
             cursor.execute(
                 "INSERT INTO transactions (receiver_id, amount, description) VALUES (%s, %s, %s)",
                 (wallet_id, req.amount, req.description)
             )
-
         elif req.transaction_type == 'withdraw':
-            # Withdraw: check balance first
             if current_balance < req.amount:
                 raise HTTPException(status_code=400, detail="Insufficient funds")
-            # Insert transaction with sender
             cursor.execute(
                 "INSERT INTO transactions (sender_id, amount, description) VALUES (%s, %s, %s)",
                 (wallet_id, req.amount, req.description)
             )
-
         elif req.transaction_type == 'transfer':
-            # Transfer: need receiver
             if not req.receiver_username:
                 raise HTTPException(status_code=400, detail="Receiver username required for transfer")
-
-            # Get receiver's wallet
+            
             cursor.execute("""
                 SELECT w.wallet_id FROM wallets w
                 JOIN users u ON w.user_id = u.user_id
@@ -242,25 +316,20 @@ async def create_transaction(req: TransactionRequest):
             receiver_wallet = cursor.fetchone()
             if not receiver_wallet:
                 raise HTTPException(status_code=404, detail="Receiver not found")
-
+            
             if current_balance < req.amount:
                 raise HTTPException(status_code=400, detail="Insufficient funds")
-
-            receiver_wallet_id = receiver_wallet['wallet_id']
             
-            # Create transaction record
+            receiver_wallet_id = receiver_wallet['wallet_id']
             cursor.execute(
                 "INSERT INTO transactions (sender_id, receiver_id, amount, description) VALUES (%s, %s, %s, %s)",
                 (wallet_id, receiver_wallet_id, req.amount, req.description)
             )
             txn_id = cursor.lastrowid
-
         elif req.transaction_type == 'request_money':
-            # Request Money: insert into money_requests table instead of transactions
             if not req.receiver_username:
                 raise HTTPException(status_code=400, detail="Receiver username required for request")
-
-            # Get receiver's wallet (payee)
+            
             cursor.execute("""
                 SELECT w.wallet_id FROM wallets w
                 JOIN users u ON w.user_id = u.user_id
@@ -269,21 +338,18 @@ async def create_transaction(req: TransactionRequest):
             payee_wallet = cursor.fetchone()
             if not payee_wallet:
                 raise HTTPException(status_code=404, detail="User not found")
-
+            
             payee_wallet_id = payee_wallet['wallet_id']
-
-            # create request record
             cursor.execute(
                 "INSERT INTO money_requests (requester_id, payee_id, amount, description, status) VALUES (%s, %s, %s, %s, 'pending')",
                 (wallet_id, payee_wallet_id, req.amount, req.description)
             )
-
         else:
             raise HTTPException(status_code=400, detail="Invalid transaction type")
-
+        
         conn.commit()
         
-        # Get updated balance for sender/user
+        # Get updated balance
         cursor.execute("""
             SELECT COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END), 0) -
                    COALESCE(SUM(CASE WHEN sender_id = %s THEN amount ELSE 0 END), 0) as new_balance
@@ -293,10 +359,8 @@ async def create_transaction(req: TransactionRequest):
         result = cursor.fetchone()
         new_balance = float(result['new_balance']) if result else 0.0
         
-        # Update stored balance for the user
         cursor.execute("UPDATE wallets SET balance = %s WHERE wallet_id = %s", (new_balance, wallet_id))
         
-        # If this was a transfer, also update receiver's balance
         if receiver_wallet_id:
             cursor.execute("""
                 SELECT COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END), 0) -
@@ -314,22 +378,20 @@ async def create_transaction(req: TransactionRequest):
         if 'txn_id' in locals() and txn_id:
             resp['transaction_id'] = txn_id
         return resp
-
     except HTTPException:
+        conn.rollback()
         raise
     except Exception as err:
+        conn.rollback()
         print(f"Transaction Error: {err}")
         raise HTTPException(status_code=500, detail="Transaction failed")
     finally:
-        if conn:
-            conn.close()
+        cursor.close()
+        conn.close()
 
 @app.get("/api/ledger/{wallet_id}")
 async def get_ledger(wallet_id: int):
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
         query = """
             SELECT t.*, 
                    su.full_name as sender_name, 
@@ -342,25 +404,16 @@ async def get_ledger(wallet_id: int):
             WHERE t.sender_id = %s OR t.receiver_id = %s 
             ORDER BY t.created_at DESC
         """
-        cursor.execute(query, (wallet_id, wallet_id))
-        transactions = cursor.fetchall()
+        transactions = execute_query(query, (wallet_id, wallet_id))
         return {"transactions": transactions}
     except Exception as err:
         print(f"Ledger Error: {err}")
         return {"transactions": []}
-    finally:
-        if conn:
-            conn.close()
 
 @app.get("/api/user/{user_id}")
 async def get_user_data(user_id: int):
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-
-        # Get user info with calculated balance
-        cursor.execute("""
+        query = """
             SELECT u.user_id, u.username, u.full_name, u.role, w.wallet_id,
                    COALESCE(SUM(CASE WHEN t.receiver_id = w.wallet_id THEN t.amount ELSE 0 END), 0) -
                    COALESCE(SUM(CASE WHEN t.sender_id = w.wallet_id THEN t.amount ELSE 0 END), 0) as balance
@@ -369,73 +422,50 @@ async def get_user_data(user_id: int):
             LEFT JOIN transactions t ON t.sender_id = w.wallet_id OR t.receiver_id = w.wallet_id
             WHERE u.user_id = %s
             GROUP BY u.user_id, w.wallet_id
-        """, (user_id,))
-        user = cursor.fetchone()
-
-        if user:
-            # Update the stored balance to match calculated balance
-            cursor.execute("UPDATE wallets SET balance = %s WHERE user_id = %s", (user['balance'], user_id))
-            conn.commit()
-            return {"status": "success", "balance": float(user['balance'])}
-
-        raise HTTPException(status_code=404, detail="User not found")
-
+        """
+        users = execute_query(query, (user_id,))
+        if not users:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        user = users[0]
+        execute_query("UPDATE wallets SET balance = %s WHERE user_id = %s", (user['balance'], user_id), fetch=False)
+        return {"status": "success", "balance": float(user['balance'])}
+    except HTTPException:
+        raise
     except Exception as err:
         print(f"User Data Error: {err}")
         raise HTTPException(status_code=500, detail="Failed to get user data")
-    finally:
-        if conn:
-            conn.close()
 
 @app.get("/api/users/search")
 async def search_users(query: str):
-    """Search for users by username or name"""
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-        
         search_term = f"%{query}%"
-        cursor.execute("""
+        users = execute_query("""
             SELECT user_id, username, full_name FROM users 
             WHERE (username LIKE %s OR full_name LIKE %s) AND user_id != 0
             LIMIT 10
         """, (search_term, search_term))
-        
-        users = cursor.fetchall()
         return {"status": "success", "users": users}
-    
     except Exception as err:
         print(f"Search Error: {err}")
         return {"status": "error", "users": []}
-    finally:
-        if conn:
-            conn.close()
-
 
 @app.get("/api/admin/accounts")
 async def admin_list_accounts(user_id: int):
-    """Return all user accounts and wallet balances for admin users only."""
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-
-        # Verify requester is admin
-        cursor.execute("SELECT role FROM users WHERE user_id = %s", (user_id,))
-        r = cursor.fetchone()
-        if not r or r.get('role') != 'admin':
+        # Verify admin
+        users = execute_query("SELECT role FROM users WHERE user_id = %s", (user_id,))
+        if not users or users[0].get('role') != 'admin':
             raise HTTPException(status_code=403, detail="Admin access required")
-
-        cursor.execute("""
+        
+        accounts = execute_query("""
             SELECT u.user_id, u.username, u.full_name, u.role, w.wallet_id, w.balance
             FROM users u
             JOIN wallets w ON u.user_id = w.user_id
             ORDER BY u.user_id ASC
         """)
-        rows = cursor.fetchall()
-
-        accounts = [
+        
+        return {'status': 'success', 'accounts': [
             {
                 'user_id': row['user_id'],
                 'username': row['username'],
@@ -444,44 +474,29 @@ async def admin_list_accounts(user_id: int):
                 'wallet_id': row['wallet_id'],
                 'balance': float(row['balance']) if row['balance'] is not None else 0.0
             }
-            for row in rows
-        ]
-
-        return {'status': 'success', 'accounts': accounts}
-
+            for row in accounts
+        ]}
     except HTTPException:
         raise
     except Exception as err:
         print(f"Admin accounts error: {err}")
         raise HTTPException(status_code=500, detail="Failed to fetch accounts")
-    finally:
-        if conn:
-            conn.close()
 
 @app.get("/api/stats")
 async def get_stats(user_id: int):
-    """Get user statistics"""
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-        
-        # Get wallet
-        cursor.execute("SELECT wallet_id FROM wallets WHERE user_id = %s", (user_id,))
-        wallet = cursor.fetchone()
-        
-        if not wallet:
+        wallets = execute_query("SELECT wallet_id FROM wallets WHERE user_id = %s", (user_id,))
+        if not wallets:
             raise HTTPException(status_code=404, detail="Wallet not found")
         
-        wallet_id = wallet['wallet_id']
+        wallet_id = wallets[0]['wallet_id']
         
-        # Count transactions
-        cursor.execute("SELECT COUNT(*) as count FROM transactions WHERE sender_id = %s OR receiver_id = %s", 
-                      (wallet_id, wallet_id))
-        txn_count = cursor.fetchone()['count']
+        txn_count_result = execute_query("""
+            SELECT COUNT(*) as count FROM transactions WHERE sender_id = %s OR receiver_id = %s
+        """, (wallet_id, wallet_id))
+        txn_count = txn_count_result[0]['count']
         
-        # Sum received vs sent
-        cursor.execute("""
+        result = execute_query("""
             SELECT 
                 COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END), 0) as total_received,
                 COALESCE(SUM(CASE WHEN sender_id = %s THEN amount ELSE 0 END), 0) as total_sent
@@ -489,32 +504,23 @@ async def get_stats(user_id: int):
             WHERE sender_id = %s OR receiver_id = %s
         """, (wallet_id, wallet_id, wallet_id, wallet_id))
         
-        result = cursor.fetchone()
-        
         return {
             "status": "success",
             "total_transactions": txn_count,
-            "total_received": float(result['total_received']),
-            "total_sent": float(result['total_sent']),
-            "net": float(result['total_received']) - float(result['total_sent'])
+            "total_received": float(result[0]['total_received']),
+            "total_sent": float(result[0]['total_sent']),
+            "net": float(result[0]['total_received']) - float(result[0]['total_sent'])
         }
-    
+    except HTTPException:
+        raise
     except Exception as err:
         print(f"Stats Error: {err}")
         raise HTTPException(status_code=500, detail="Failed to get stats")
-    finally:
-        if conn:
-            conn.close()
 
 @app.get("/api/pending-requests/{wallet_id}")
 async def get_pending_requests(wallet_id: int):
-    """Get pending money requests where the given wallet is the payee"""
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
+        reqs = execute_query("""
             SELECT r.request_id,
                    r.requester_id,
                    r.payee_id,
@@ -529,8 +535,6 @@ async def get_pending_requests(wallet_id: int):
             WHERE r.payee_id = %s AND r.status = 'pending'
             ORDER BY r.created_at DESC
         """, (wallet_id,))
-        
-        reqs = cursor.fetchall()
         
         return {
             "status": "success",
@@ -549,27 +553,24 @@ async def get_pending_requests(wallet_id: int):
     except Exception as err:
         print(f"Pending Requests Error: {err}")
         raise HTTPException(status_code=500, detail="Failed to get pending requests")
-    finally:
-        if conn:
-            conn.close()
-
 
 @app.get("/api/transactions")
 async def list_transactions(
     user_id: int,
-    q: Optional[str] = Query(None, description="Search text for description or counterparty"),
-    txn_type: Optional[str] = Query(None, description="filter by 'credit' or 'debit'"),
-    since: Optional[str] = Query(None, description="ISO date start"),
-    until: Optional[str] = Query(None, description="ISO date end"),
+    q: Optional[str] = Query(None),
+    txn_type: Optional[str] = Query(None),
+    since: Optional[str] = Query(None),
+    until: Optional[str] = Query(None),
     limit: int = 50
 ):
-    """List and filter transactions for a user's wallet."""
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-
-        # build base query
+        # First get wallet_id
+        wallets = execute_query("SELECT wallet_id FROM wallets WHERE user_id = %s", (user_id,))
+        if not wallets:
+            return {"status": "success", "transactions": []}
+        
+        wallet_id = wallets[0]['wallet_id']
+        
         sql = """
             SELECT t.*, su.full_name as sender_name, ru.full_name as receiver_name
             FROM transactions t
@@ -579,58 +580,47 @@ async def list_transactions(
             LEFT JOIN users ru ON rw.user_id = ru.user_id
             WHERE (t.sender_id = %s OR t.receiver_id = %s)
         """
-        params = [user_id, user_id]
-
+        params = [wallet_id, wallet_id]
+        
         if q:
             sql += " AND (t.description LIKE %s OR su.username LIKE %s OR ru.username LIKE %s)"
             like = f"%{q}%"
             params.extend([like, like, like])
-
+        
         if txn_type:
             if txn_type == 'debit':
                 sql += " AND t.sender_id = %s"
-                params.append(user_id)
+                params.append(wallet_id)
             elif txn_type == 'credit':
                 sql += " AND t.receiver_id = %s"
-                params.append(user_id)
-
+                params.append(wallet_id)
+        
         if since:
             sql += " AND t.created_at >= %s"
             params.append(since)
         if until:
             sql += " AND t.created_at <= %s"
             params.append(until)
-
+        
         sql += " ORDER BY t.created_at DESC LIMIT %s"
         params.append(limit)
-
-        cursor.execute(sql, tuple(params))
-        rows = cursor.fetchall()
-        return {"status": "success", "transactions": rows}
-
+        
+        transactions = execute_query(sql, tuple(params))
+        return {"status": "success", "transactions": transactions}
     except Exception as err:
         print(f"Transactions list error: {err}")
         raise HTTPException(status_code=500, detail="Failed to list transactions")
-    finally:
-        if conn:
-            conn.close()
-
 
 @app.get("/api/contacts")
 async def recent_contacts(user_id: int, limit: int = 10):
-    """Return recent contacts (counterparties) for a user's wallet."""
-    conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-        # find wallet
-        cursor.execute("SELECT wallet_id FROM wallets WHERE user_id = %s", (user_id,))
-        w = cursor.fetchone()
-        if not w:
+        wallets = execute_query("SELECT wallet_id FROM wallets WHERE user_id = %s", (user_id,))
+        if not wallets:
             raise HTTPException(status_code=404, detail="Wallet not found")
-        wid = w['wallet_id']
-
-        cursor.execute("""
+        
+        wid = wallets[0]['wallet_id']
+        
+        contacts = execute_query("""
             SELECT DISTINCT
                 CASE WHEN t.sender_id = %s THEN ru.username ELSE su.username END as username,
                 CASE WHEN t.sender_id = %s THEN ru.full_name ELSE su.full_name END as full_name
@@ -643,39 +633,29 @@ async def recent_contacts(user_id: int, limit: int = 10):
             ORDER BY t.created_at DESC
             LIMIT %s
         """, (wid, wid, wid, wid, limit))
-
-        rows = cursor.fetchall()
-        return {"status": "success", "contacts": rows}
-
+        
+        return {"status": "success", "contacts": contacts}
     except HTTPException:
         raise
     except Exception as err:
         print(f"Contacts error: {err}")
         return {"status": "error", "contacts": []}
-    finally:
-        if conn:
-            conn.close()
 
 @app.post("/api/approve-request")
 async def approve_request(req: ApproveRequest):
-    conn = None
+    conn = get_db_connection()
+    cursor = get_cursor(conn)
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-
-        # fetch money request
         cursor.execute("SELECT * FROM money_requests WHERE request_id = %s", (req.request_id,))
         request_row = cursor.fetchone()
         if not request_row:
             raise HTTPException(status_code=404, detail="Request not found")
         if request_row['status'] != 'pending':
             raise HTTPException(status_code=400, detail="Request already processed")
-
-        # ensure payee matches
+        
         if request_row['payee_id'] != req.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to approve this request")
-
-        # check payee balance
+        
         cursor.execute("""
             SELECT COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END),0) -
                    COALESCE(SUM(CASE WHEN sender_id = %s THEN amount ELSE 0 END),0) as bal
@@ -687,18 +667,15 @@ async def approve_request(req: ApproveRequest):
         amount = float(request_row['amount'])
         if payee_balance < amount:
             raise HTTPException(status_code=400, detail="Insufficient funds to approve request")
-
-        # perform transfer from payee -> requester
+        
         cursor.execute(
             "INSERT INTO transactions (sender_id, receiver_id, amount, description) VALUES (%s,%s,%s,%s)",
             (request_row['payee_id'], request_row['requester_id'], amount, request_row['description'])
         )
-
-        # mark request approved
+        
         cursor.execute("UPDATE money_requests SET status='approved' WHERE request_id=%s", (req.request_id,))
         conn.commit()
-
-        # compute new balances for both parties
+        
         cursor.execute("""
             SELECT COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END),0) -
                    COALESCE(SUM(CASE WHEN sender_id = %s THEN amount ELSE 0 END),0) as balance
@@ -706,7 +683,7 @@ async def approve_request(req: ApproveRequest):
             WHERE sender_id = %s OR receiver_id = %s
         """, (req.user_id, req.user_id, req.user_id, req.user_id))
         payee_new = cursor.fetchone()['balance']
-
+        
         cursor.execute("""
             SELECT COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END),0) -
                    COALESCE(SUM(CASE WHEN sender_id = %s THEN amount ELSE 0 END),0) as balance
@@ -714,42 +691,37 @@ async def approve_request(req: ApproveRequest):
             WHERE sender_id = %s OR receiver_id = %s
         """, (request_row['requester_id'], request_row['requester_id'], request_row['requester_id'], request_row['requester_id']))
         requester_new = cursor.fetchone()['balance']
-
+        
         return {"status":"success","payee_new_balance":float(payee_new),"requester_new_balance":float(requester_new)}
     except HTTPException:
+        conn.rollback()
         raise
     except Exception as err:
+        conn.rollback()
         print(f"Approve Request Error: {err}")
         raise HTTPException(status_code=500, detail="Failed to approve request")
     finally:
-        if conn:
-            conn.close()
-
+        cursor.close()
+        conn.close()
 
 @app.post("/api/reverse-transaction")
 async def reverse_transaction(req: ReverseRequest):
-    conn = None
+    conn = get_db_connection()
+    cursor = get_cursor(conn)
     try:
-        conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-
-        # fetch the original transaction (use txn_id column)
         cursor.execute("SELECT * FROM transactions WHERE txn_id = %s LIMIT 1", (req.transaction_id,))
         orig = cursor.fetchone()
         if not orig:
             raise HTTPException(status_code=404, detail="Transaction not found")
-
-        # ensure sender and receiver exist on the transaction
+        
         sender_id = orig.get('sender_id')
         receiver_id = orig.get('receiver_id')
         if sender_id is None or receiver_id is None:
             raise HTTPException(status_code=400, detail="Transaction is not reversible")
-
-        # only the original sender may request reversal
+        
         if sender_id != req.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to reverse this transaction")
-
-        # parse created_at robustly without extra dependencies
+        
         created = orig.get('created_at')
         if isinstance(created, str):
             parsed = None
@@ -765,19 +737,17 @@ async def reverse_transaction(req: ReverseRequest):
                 except Exception:
                     raise HTTPException(status_code=400, detail="Invalid transaction timestamp")
             created = parsed
-
+        
         if not isinstance(created, datetime):
             raise HTTPException(status_code=400, detail="Invalid transaction timestamp")
-
-        # allow reversal only within a short window (30 seconds)
+        
         now = datetime.now()
         delta = (now - created).total_seconds()
         if delta > 30:
             raise HTTPException(status_code=400, detail="Reversal window expired")
-
+        
         amount = float(orig.get('amount', 0))
-
-        # check current balance of the original receiver (they must still have the funds)
+        
         cursor.execute("""
             SELECT COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END),0) -
                    COALESCE(SUM(CASE WHEN sender_id = %s THEN amount ELSE 0 END),0) as bal
@@ -788,14 +758,12 @@ async def reverse_transaction(req: ReverseRequest):
         receiver_balance = float(bal_res['bal']) if bal_res and bal_res.get('bal') is not None else 0.0
         if receiver_balance < amount:
             raise HTTPException(status_code=400, detail="Receiver has insufficient funds to reverse")
-
-        # insert reversal transaction (receiver -> sender)
+        
         cursor.execute(
             "INSERT INTO transactions (sender_id, receiver_id, amount, description) VALUES (%s,%s,%s,%s)",
             (receiver_id, sender_id, amount, f"Reversal of txn {req.transaction_id}")
         )
-
-        # update stored balances for both wallets
+        
         for wid in (receiver_id, sender_id):
             cursor.execute("""
                 SELECT COALESCE(SUM(CASE WHEN receiver_id = %s THEN amount ELSE 0 END), 0) -
@@ -806,25 +774,25 @@ async def reverse_transaction(req: ReverseRequest):
             res = cursor.fetchone()
             new_bal = float(res['balance']) if res and res.get('balance') is not None else 0.0
             cursor.execute("UPDATE wallets SET balance = %s WHERE wallet_id = %s", (new_bal, wid))
-
+        
         conn.commit()
-
         return {"status": "success", "message": "Transaction reversed", "reversal_id": cursor.lastrowid}
-
     except HTTPException:
+        conn.rollback()
         raise
     except Exception as err:
+        conn.rollback()
         print(f"Reverse Transaction Error: {err}")
         raise HTTPException(status_code=500, detail="Reversal failed")
     finally:
-        if conn:
-            conn.close()
+        cursor.close()
+        conn.close()
 
-# Mount static files to serve index.html and other assets
+# Mount static files
 if os.path.exists('static'):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Serve index.html on root path
+# Serve index.html
 @app.get("/")
 async def serve_index():
     return FileResponse("index.html")
@@ -832,6 +800,7 @@ async def serve_index():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     print(f"Starting PayFlow Backend on port {port}...")
-    print("✨ Modern Fintech Wallet API")
+    print(f"Using database: {SQL_DIALECT}")
     print(f"http://localhost:{port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
