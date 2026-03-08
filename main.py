@@ -141,23 +141,34 @@ def init_db():
             bob_hash = generate_password_hash("password")
             
             if SQL_DIALECT == 'postgres':
+                # Insert test users one by one to get their IDs properly
                 cursor.execute("""
                     INSERT INTO users (username, password_hash, full_name, role) VALUES 
-                    (%s, %s, %s, %s), (%s, %s, %s, %s), (%s, %s, %s, %s) RETURNING user_id
-                """, ('admin', admin_hash, 'System Administrator', 'admin',
-                      'alice', alice_hash, 'Alice Vance', 'user',
-                      'bob', bob_hash, 'Robert Fox', 'user'))
-                users_result = cursor.fetchall()
+                    (%s, %s, %s, %s) RETURNING user_id
+                """, ('admin', admin_hash, 'System Administrator', 'admin'))
+                admin_id = cursor.fetchone()['user_id']
+                
+                cursor.execute("""
+                    INSERT INTO users (username, password_hash, full_name, role) VALUES 
+                    (%s, %s, %s, %s) RETURNING user_id
+                """, ('alice', alice_hash, 'Alice Vance', 'user'))
+                alice_id = cursor.fetchone()['user_id']
+                
+                cursor.execute("""
+                    INSERT INTO users (username, password_hash, full_name, role) VALUES 
+                    (%s, %s, %s, %s) RETURNING user_id
+                """, ('bob', bob_hash, 'Robert Fox', 'user'))
+                bob_id = cursor.fetchone()['user_id']
                 
                 # Create wallets for each user
-                for user in users_result:
-                    cursor.execute("INSERT INTO wallets (user_id, balance) VALUES (%s, %s)", 
-                                  (user['user_id'], 1000.00))
+                cursor.execute("INSERT INTO wallets (user_id, balance) VALUES (%s, %s)", (admin_id, 1000.00))
+                cursor.execute("INSERT INTO wallets (user_id, balance) VALUES (%s, %s)", (alice_id, 1000.00))
+                cursor.execute("INSERT INTO wallets (user_id, balance) VALUES (%s, %s)", (bob_id, 1000.00))
                 
-                # Add some initial transactions
-                cursor.execute("SELECT wallet_id FROM users WHERE username = 'admin'")
+                # Add initial transaction
+                cursor.execute("SELECT wallet_id FROM wallets WHERE user_id = %s", (admin_id,))
                 admin_wallet = cursor.fetchone()
-                cursor.execute("SELECT wallet_id FROM users WHERE username = 'alice'")
+                cursor.execute("SELECT wallet_id FROM wallets WHERE user_id = %s", (alice_id,))
                 alice_wallet = cursor.fetchone()
                 
                 if admin_wallet and alice_wallet:
