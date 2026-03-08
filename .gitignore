@@ -11,3 +11,6 @@ ENV/
 .DS_Store
 *.db
 
+# Environment variables (do not commit secrets)
+.env
+

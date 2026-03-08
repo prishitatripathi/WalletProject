@@ -11,6 +11,10 @@ from datetime import datetime
 from typing import Optional
 from fastapi import Query
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = FastAPI()
 
