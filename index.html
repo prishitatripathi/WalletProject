@@ -1284,7 +1284,11 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8080/api';
+        // API Base URL - automatically detects cloud deployment
+        // For local: http://localhost:8080
+        // For cloud: uses the same origin (deployed URL)
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const API_BASE = isLocal ? 'http://localhost:8080/api' : '/api';
         let currentUser = null;
         let allTransactions = [];
         let recentContacts = [];
