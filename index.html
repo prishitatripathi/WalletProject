@@ -1533,9 +1533,9 @@
                     setTimeout(() => closeModal('send-modal'), 1500);
                     fetchTransactions();
 
-                    // show undo bar for reversible transfer (30s)
-                    if (data.txn_id) {
-                        showUndoBar(data.txn_id, amount);
+
+if (data.transaction_id) {
+showUndoBar(data.transaction_id, amount);
                     }
                 } else {
                     showAlert('send-alert', data.detail || 'Transaction failed', 'error');
