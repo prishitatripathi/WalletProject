@@ -104,9 +104,9 @@ Open `index.html` in your web browser or serve it with a web server.
 ## 🔐 Default Users
 
 The system comes with pre-configured users:
-- **admin** / admin123 (Administrator)
-- **alice** / 123 (Regular User)
-- **bob** / 456 (Regular User)
+- **admin** / password (Administrator)
+- **alice** / password (Regular User)
+- **bob** / password (Regular User)
 
 ## 🎨 User Interface
 
